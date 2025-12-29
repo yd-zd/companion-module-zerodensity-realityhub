@@ -1,5 +1,116 @@
 # RealityHub Companion Module - Development Logbook
 
+## 2025-12-29: Version 2.1.2 - Lino Rundown Controls and Show Status Fixes
+
+### Major Features Added
+
+#### 1. Lino Rundown Item Playback Controls
+Added comprehensive playback control actions for rundown items:
+- **Play Item** - Play rundown item to Program (PGM) or Preview (PVW)
+- **Out Item** - Take out rundown item from Program or Preview
+- **Continue Item** - Continue animation of item on Program or Preview
+- **Play Next** - Play next item in rundown to Program or Preview
+
+All actions support channel selection (0 = Program, 1 = Preview) matching RealityHub's dual-channel architecture.
+
+**API Endpoints Used:**
+- `PUT /lino/rundown/{showId}/play/{itemId}/{preview}`
+- `PUT /lino/rundown/{showId}/out/{itemId}/{preview}`
+- `PUT /lino/rundown/{showId}/continue/{itemId}/{preview}`
+- `PUT /lino/rundown/{showId}/playnext/{preview}`
+
+**New Presets:**
+- Created `Lino Playback: {rundown}` category with presets for each item
+- Color-coded buttons: Green for Preview, Red for Program, Yellow for Continue
+- Includes "Play Next" buttons for quick rundown navigation
+
+### Critical Fixes
+
+#### 2. Show Status Detection Consistency
+**Problem:** The `/launcher` API returns `running` property while `/lino/engines` returns `started` property. These can be inconsistent, causing rundowns to not load or button triggers to fail.
+
+**Solution:** Updated all Show status checks to use `show.running || show.started` throughout the codebase:
+- `features/engines.js` - Show selection and rundownToShowMap building
+- `features/rundowns.js` - Rundown filtering and loading
+- `actions.js` - Button trigger validation
+- `variables.js` - Show status variables
+- `presets.js` - Preset category indicators
+
+#### 3. Rundown-to-Show Mapping
+**Problem:** The RealityHub API has confusing naming - Lino "engines" are actually "Shows", and `GET /lino/rundowns/{engineId}` returns ALL rundowns regardless of the engineId parameter.
+
+**Solution:** 
+- Built `rundownToShowMap` using `loadedRundownsInfo` from each Show
+- Filter rundowns to only show those actually loaded on running Shows
+- Use correct Show ID (not Reality Engine ID) for all Lino API calls
+
+**Key Architecture Understanding:**
+- **Reality Engines** (`/api/rest/v1/engines`) - Physical render machines (IDs: 41, 42, 44...)
+- **Shows** (`/api/rest/v1/launcher`) - Logical groupings controlling engines (IDs: 60, 92, 96...)
+- **Lino "Engines"** (`/api/rest/v1/lino/engines`) - **SAME AS SHOWS** (legacy naming confusion)
+- All Lino API `{engineId}` parameters are actually **Show IDs**
+
+#### 4. Data Structure Initialization
+Added proper initialization of new data structures in `index.js`:
+- `shows` - Rich Show data from `/launcher` API
+- `linoEngines` - Backward compatibility (same as shows)
+- `rundownToShowMap` - Maps rundownId → showId for button triggers
+- `primaryShowId` - First running Show ID
+- `linoEngineId` - Backward compatibility
+
+#### 5. Safety Improvements
+- Added null safety checks for `config.features` and `config.interval`
+- Improved error handling in `configUpdated()` method
+- Added null checks for `inst.data.engines` in `features/nodes.js`
+
+### Files Changed
+- `features/engines.js` - Show status checks, rundownToShowMap building
+- `features/rundowns.js` - Rundown filtering, item selection options
+- `actions.js` - New playback control actions, Show status validation
+- `variables.js` - Show status variables with dual property checks
+- `presets.js` - Lino Playback presets, Show status indicators
+- `index.js` - Data structure initialization, safety checks
+
+### Related Dashboard Fixes
+Fixed race condition in `rhub-api-dashboard` when switching Shows:
+- Clear rundown selection before loading new rundowns
+- Filter rundowns by `loadedRundownsInfo` to prevent 404 errors
+- Disable non-started Shows in dropdown
+
+---
+
+## 2025-12-29: Version 2.1.1 - Skip Offline Lino Engines When Fetching Rundowns
+
+### Problem
+RealityHub server was logging excessive error messages when the companion module polled for rundowns:
+```
+INFO: Executing action: getRundowns for rundownEngineId: 81
+TRACE: Cannot get rundown engine for rundownEngineId: 81, action: getRundowns
+```
+
+This occurred because the module was querying rundowns for ALL Lino engines, including those that were offline/not started.
+
+### Root Cause
+In `features/rundowns.js`, the code was iterating through all Lino engines:
+```javascript
+const linoEngineIds = Object.keys(inst.data.linoEngines)
+```
+
+This included offline engines (where `started: false`), causing errors on the RealityHub server.
+
+### Solution
+Filter Lino engines to only query those that are currently started/online:
+```javascript
+const linoEngineIds = Object.keys(inst.data.linoEngines).filter(id => inst.data.linoEngines[id].started === true)
+```
+
+The `started` property from the Lino engine API indicates whether an engine is currently active and ready to serve requests.
+
+### Files Changed
+- `features/rundowns.js` - Only query rundowns from started Lino engines
+
+---
+
 ## 2025-12-28: Module Packaging for Offline Distribution
 
 ### Problem

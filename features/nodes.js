@@ -76,17 +76,18 @@ export const loadNodes = async (inst) => {
     inst.updateVariables({ updateNodesProgress:  inst.data.module.updateNodesProgress + '%' })
 
     let nodes = {}
-    const engines = Object.keys(inst.data.engines).length
+    const enginesData = inst.data?.engines || {}
+    const engines = Object.keys(enginesData).length
 
     let totalSteps = 0
     let currentStep = 0
     const singleSteps = []
 
     // loop over all available engines
-    for (const engine of Object.keys(inst.data.engines)) {
+    for (const engine of Object.keys(enginesData)) {
 
         // continue loop if engines has no active project loaded
-        if (!inst.data.engines[engine].activeProject) continue
+        if (!enginesData[engine].activeProject) continue
 
         // create parameter for current engine in "nodes" object
         nodes[engine] = {}
@@ -174,7 +175,7 @@ export const loadNodes = async (inst) => {
 
         if (Object.keys(nodes).length === 0) break
 
-        if (!inst.moduleInitiated) inst.log('info', `${Object.keys(nodes[engine]).length} nodes loaded from ${inst.data.engines[engine].displayName}`)
+        if (!inst.moduleInitiated) inst.log('info', `${Object.keys(nodes[engine]).length} nodes loaded from ${enginesData[engine].displayName}`)
     }
 
     if (inst.enableRequests === false) {
@@ -226,9 +227,10 @@ export const nodePropertiesOptions = (inst) => {
     }
 
     const propertyOptions = []
+    const enginesForProps = inst.data?.engines || {}
 
     // loop over all engines
-    for (const engine of Object.keys(inst.data.engines)) {
+    for (const engine of Object.keys(enginesForProps)) {
 
         // continue loop if engine has no nodes
         if (inst.data.nodes[engine] === undefined) continue
@@ -368,9 +370,10 @@ export const nodeFunctionsOptions = (inst) => {
     }
 
     const functionOptions = []
+    const enginesForFuncs = inst.data?.engines || {}
 
     // loop over all engines
-    for (const engine of Object.keys(inst.data.engines)) {
+    for (const engine of Object.keys(enginesForFuncs)) {
 
         // continue loop if engine has no nodes
         if (inst.data.nodes[engine] === undefined) continue

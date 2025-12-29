@@ -65,10 +65,15 @@ class RealityHubInstance extends InstanceBase {
 
 		// create data object to store data from reality hub
 		this.data = {
-			engines: {},
-			rundowns: {},
+			engines: {},        // Reality Engines (physical machines)
+			shows: {},          // Shows (logical groupings that control engines)
+			rundowns: {},       // Rundowns loaded on running shows
 			templates: {},
 			nodes: {},
+			linoEngines: {},    // Backward compatibility (same as shows)
+			rundownToShowMap: {}, // Maps rundownId -> showId for button triggers
+			primaryShowId: null,  // First running show
+			linoEngineId: null,   // Backward compatibility (same as primaryShowId)
 			module: {
 				updateEnginesData: false,
 				updateEnginesDuration: 0,
@@ -243,25 +248,30 @@ class RealityHubInstance extends InstanceBase {
 		// start engines timer
 		this.data.timer.updateEngines.start(5000)
 
+		// Safe access to features array
+		const features = this.config?.features || []
+		const interval = (this.config?.interval || 10) * 1000
+
 		// check if "Auto-Update Nodes" is true
-		if (this.config['nodes' + this.config.features.findIndex((element) => element === 'nodes')] === true) {
-			this.data.timer.updateNodes.start(this.config.interval*1000)
-			this.log('debug', `Auto updater for "nodes" data with delay of ${this.config.interval*1000}ms started!`)
+		const nodesIndex = features.findIndex((element) => element === 'nodes')
+		if (nodesIndex >= 0 && this.config['nodes' + nodesIndex] === true) {
+			this.data.timer.updateNodes.start(interval)
+			this.log('debug', `Auto updater for "nodes" data with delay of ${interval}ms started!`)
 		}
 
 		// check if "Auto-Update Rundowns" is true
-		if (this.config['rundowns' + this.config.features.findIndex((element) => element === 'rundowns')] === true) {
-			this.data.timer.updateRundowns.start(this.config.interval*1000)
-			this.log('debug', `Auto updater for "rundowns" data with delay of ${this.config.interval*1000}ms started!`)
+		const rundownsIndex = features.findIndex((element) => element === 'rundowns')
+		if (rundownsIndex >= 0 && this.config['rundowns' + rundownsIndex] === true) {
+			this.data.timer.updateRundowns.start(interval)
+			this.log('debug', `Auto updater for "rundowns" data with delay of ${interval}ms started!`)
 		}
 
 		// check if "Auto-Update Templates" is true
-		if (this.config['templates' + this.config.features.findIndex((element) => element === 'templates')] === true) {
-			this.data.timer.updateTemplates.start(this.config.interval*1000)
-			this.log('debug', `Auto updater for "templates" data with delay of ${this.config.interval*1000}ms started!`)
+		const templatesIndex = features.findIndex((element) => element === 'templates')
+		if (templatesIndex >= 0 && this.config['templates' + templatesIndex] === true) {
+			this.data.timer.updateTemplates.start(interval)
+			this.log('debug', `Auto updater for "templates" data with delay of ${interval}ms started!`)
 		}
-
-
 	}
 
 	// handle errors
@@ -286,16 +296,33 @@ class RealityHubInstance extends InstanceBase {
 
 	// update config and try to connect to init module
 	async configUpdated(config, retry=false) {
-		// check for valid ip address
-		if (config.host.split('.').length !== 4 || (contains(config.features, 'templates') && config.name === '')) {
+		// Safety check: ensure config object exists
+		if (!config) {
 			this.updateStatus('Waiting for config!')
+			this.log('debug', 'No configuration provided yet')
+			return
+		}
+
+		// Check for valid IP address (must be provided and look like an IP)
+		const host = config.host || ''
+		if (!host || host.split('.').length !== 4) {
+			this.updateStatus('Waiting for config!')
+			this.log('debug', 'Waiting for valid RealityHub IP address')
+			return
+		}
+
+		// Check for valid template pool name if templates feature is enabled
+		const features = config.features || []
+		if (contains(features, 'templates') && !config.templatePool) {
+			this.updateStatus('Waiting for config!')
+			this.log('debug', 'Waiting for template pool name')
 			return
 		}
 
 		let featuresChanged = false
 		if (this.config.features === undefined) this.config.features = []
-		for (const feature of config.features) if (!this.config.features.includes(feature)) featuresChanged = true
-		for (const feature of this.config.features) if (!config.features.includes(feature)) featuresChanged = true
+		for (const feature of features) if (!this.config.features.includes(feature)) featuresChanged = true
+		for (const feature of this.config.features) if (!features.includes(feature)) featuresChanged = true
 
 		await this.destroy()
 		this.executors.requests.unblock()
