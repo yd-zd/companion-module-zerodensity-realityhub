@@ -1,14 +1,22 @@
 // engines
+// 
+// ARCHITECTURE NOTE:
+// - Reality Engines: Physical render machines (/api/rest/v1/engines) - IDs like 41, 42, 44
+// - Shows: Logical groupings that control engines (/api/rest/v1/launcher) - IDs like 60, 92, 96
+// - Lino "Engines": Same as Shows but with loadedRundownsInfo (/api/rest/v1/lino/engines)
+// 
+// We fetch BOTH /launcher (rich data) and /lino/engines (loadedRundownsInfo) and merge them
 
 import { getVariables } from '../variables.js'
 import { ms2S, isEqual } from '../tools.js'
 
 
-// creating multidropdown with all available engines
+// Creating multidropdown with all available Reality Engines
 export const engineSelection = (inst, defaultOnly=false) => {
     const defaultEngines = []
     const engineChoices = []
-    for (const [id, engine] of Object.entries(inst.data.engines)) {
+    const engines = inst.data?.engines || {}
+    for (const [id, engine] of Object.entries(engines)) {
         defaultEngines.push(id)
         engineChoices.push({ id: id, label: engine.displayName })
     }
@@ -21,20 +29,21 @@ export const engineSelection = (inst, defaultOnly=false) => {
         label: 'Select Engines:',
         default: defaultEngines,
         choices: engineChoices,
-        tooltip: 'Select target engines for this action or feedback'
+        tooltip: 'Select target Reality Engines for this action or feedback'
     }
 }
 
-// creating normal dropdown with all available engines
+// Creating normal dropdown with all available Reality Engines
 export const engineSelectionSingle = (inst, defaultOnly=false) => {
     let defaultEngine = undefined
     const engineChoices = []
-    for (const [id, engine] of Object.entries(inst.data.engines)) {
+    const engines = inst.data?.engines || {}
+    for (const [id, engine] of Object.entries(engines)) {
         if (defaultEngine === undefined) defaultEngine = id
         engineChoices.push({ id: id, label: engine.displayName })
     }
 
-    if (defaultOnly === true) return defaultEngines
+    if (defaultOnly === true) return defaultEngine
 
     return {
         type: 'dropdown',
@@ -42,38 +51,90 @@ export const engineSelectionSingle = (inst, defaultOnly=false) => {
         label: 'Select Engine:',
         default: defaultEngine,
         choices: engineChoices,
-        tooltip: 'Select target engine for this action or feedback'
+        tooltip: 'Select target Reality Engine for this action or feedback'
     }
 }
 
-// loading data related to connected engines
+// Creating dropdown with all available Shows (for rundown operations)
+export const showSelection = (inst, defaultOnly=false, runningOnly=true) => {
+    let defaultShow = undefined
+    const showChoices = []
+    
+    for (const [id, show] of Object.entries(inst.data.shows || {})) {
+        // Check both running (from /launcher) and started (from /lino/engines)
+        const isActive = show.running || show.started
+        // Skip non-running shows if runningOnly is true
+        if (runningOnly && !isActive) continue
+        
+        if (defaultShow === undefined) defaultShow = id
+        const status = isActive ? '🟢' : '⚪'
+        showChoices.push({ id: id, label: `${status} ${show.name}` })
+    }
+
+    if (defaultOnly === true) return defaultShow
+
+    return {
+        type: 'dropdown',
+        id: 'show',
+        label: 'Select Show:',
+        default: defaultShow,
+        choices: showChoices,
+        tooltip: 'Select Show for rundown operations (only running shows can trigger actions)'
+    }
+}
+
+// Creating multidropdown with all available Shows
+export const showSelectionMulti = (inst, defaultOnly=false, runningOnly=false) => {
+    const defaultShows = []
+    const showChoices = []
+    
+    for (const [id, show] of Object.entries(inst.data.shows || {})) {
+        // Check both running (from /launcher) and started (from /lino/engines)
+        const isActive = show.running || show.started
+        if (runningOnly && !isActive) continue
+        
+        defaultShows.push(id)
+        const status = isActive ? '🟢' : '⚪'
+        showChoices.push({ id: id, label: `${status} ${show.name}` })
+    }
+
+    if (defaultOnly === true) return defaultShows
+
+    return {
+        type: 'multidropdown',
+        id: 'shows',
+        label: 'Select Shows:',
+        default: defaultShows,
+        choices: showChoices,
+        tooltip: 'Select Shows to monitor or control'
+    }
+}
+
+// Loading data related to Reality Engines and Shows
 export const loadEngines = async (inst) => {
 
-    // indicate avtive engine loading
+    // Indicate active engine loading
     inst.data.module.updateEnginesData = true
 
-    // update data loading feedback
+    // Update data loading feedback
     inst.checkFeedbacks('basicFeatureDataLoading')
 
-    // save start time to calculate elapsed time
+    // Save start time to calculate elapsed time
     const start = Date.now()
 
-    // create empty "engines" object
+    // Create empty objects
     const engines = {}
+    const shows = {}
 
-    // create a variable to track the need for 'setVariableDefinitions()'
+    // Track if variable definitions need updating
     let setDefinitions = false
 
-    // request engines data
+    // ========== FETCH REALITY ENGINES ==========
+    // GET /api/rest/v1/engines - Physical render machines
     const enginesData = await inst.GET('engines', {}, 'medium')
 
-    // check if request was successfull
     if (enginesData !== null) {
-
-        // loop over each engines
         for (const engine of enginesData) {
-
-            // populate empty engine object with data
             engines[engine.id] = {
                 name: engine.name,
                 displayName: engine.displayName,
@@ -81,77 +142,139 @@ export const loadEngines = async (inst) => {
                 role: engine.role,
                 status: engine.status,
                 activeProject: (engine.rgraphId !== null),
+                ownerShowId: engine.ownerShowId || null
             }
 
-            // checks if 'setVariableDefinitions()' is nessesary
-            if (!Object.keys(inst.data.engines).includes(engine.id)) setDefinitions = true
+            if (!Object.keys(inst.data?.engines || {}).includes(String(engine.id))) {
+                setDefinitions = true
+            }
         }
+    }
 
-        // Fetch Lino-specific engines (different from Reality Engines!)
-        // Lino has its own engine system for rundown control
-        const linoEnginesData = await inst.GET('lino/engines', {}, 'medium')
-        if (linoEnginesData !== null && Array.isArray(linoEnginesData) && linoEnginesData.length > 0) {
-            inst.data.linoEngines = {}
-            for (const linoEngine of linoEnginesData) {
-                inst.data.linoEngines[linoEngine.id] = {
-                    name: linoEngine.name,
-                    started: linoEngine.started,
-                    mode: linoEngine.mode,
-                    loadedRundowns: linoEngine.loadedRundownsInfo || []
+    // ========== FETCH SHOWS (Launcher API - Rich Data) ==========
+    // GET /api/rest/v1/launcher - Shows with renderers, projects, graphs
+    const launcherData = await inst.GET('launcher', {}, 'medium')
+    
+    if (launcherData !== null && Array.isArray(launcherData)) {
+        for (const show of launcherData) {
+            shows[show.id] = {
+                name: show.name,
+                running: show.running,
+                mode: show.mode,
+                // Renderers contain rich engine/project/graph info
+                renderers: (show.renderers || []).map(r => ({
+                    id: r.id,
+                    engineHostId: r.engineHostId,
+                    engineHostName: r.engineHostName,
+                    engineHostDisplayName: r.engineHostDisplayName,
+                    projectId: r.projectId,
+                    projectName: r.projectName,
+                    projectVersion: r.projectVersion,
+                    graphId: r.graphId,
+                    graphName: r.graphName,
+                    graphChannels: r.graphChannels || [],
+                    log: r.log || null
+                })),
+                // Will be populated from lino/engines
+                loadedRundowns: []
+            }
+
+            if (!Object.keys(inst.data.shows || {}).includes(String(show.id))) {
+                setDefinitions = true
+            }
+        }
+    }
+
+    // ========== FETCH LINO ENGINES (for loadedRundownsInfo) ==========
+    // GET /api/rest/v1/lino/engines - Shows with loadedRundownsInfo
+    const linoEnginesData = await inst.GET('lino/engines', {}, 'medium')
+    
+    if (linoEnginesData !== null && Array.isArray(linoEnginesData)) {
+        for (const linoShow of linoEnginesData) {
+            // Merge loadedRundownsInfo into shows
+            if (shows[linoShow.id]) {
+                shows[linoShow.id].loadedRundowns = linoShow.loadedRundownsInfo || []
+                shows[linoShow.id].started = linoShow.started
+            } else {
+                // Show exists in lino but not in launcher (shouldn't happen normally)
+                shows[linoShow.id] = {
+                    name: linoShow.name,
+                    running: linoShow.started,
+                    started: linoShow.started,
+                    mode: linoShow.mode,
+                    renderers: [],
+                    loadedRundowns: linoShow.loadedRundownsInfo || []
                 }
             }
-            // Set primary Lino engine ID (prefer started engines)
-            const startedLinoEngine = linoEnginesData.find(e => e.started === true)
-            inst.data.linoEngineId = startedLinoEngine ? startedLinoEngine.id : linoEnginesData[0].id
-            inst.log('debug', `Found ${linoEnginesData.length} Lino engines. Selected Lino Engine ID: ${inst.data.linoEngineId}`)
-        } else {
-            inst.data.linoEngines = {}
-            inst.data.linoEngineId = null
-            inst.log('warn', 'No Lino engines found for rundown operations')
         }
 
-        // save elapsed time
-        inst.data.module.updateEnginesDuration = Date.now()-start
-
-        // checking for a change
-        if (!isEqual(inst.data.engines, engines)) {
-
-            // saves new engines data
-            inst.data.engines = engines
-
-            // get variable definitions and values
-            const [def, val] = getVariables(inst)
-
-            // set variable definitions if nessesary
-            if (setDefinitions) inst.setVariableDefinitions(def)
-
-            // set variable values
-            inst.updateVariables(val)
-        }
-        // if no change, only update variable for showing "update duration" for engines
-        else inst.updateVariables({ updateEnginesDuration:  `${ms2S(inst.data.module.updateEnginesDuration)}s` })
+        // Set primary show ID (prefer running shows - check both running and started)
+        const runningShow = Object.entries(shows).find(([id, s]) => s.running === true || s.started === true)
+        inst.data.primaryShowId = runningShow ? runningShow[0] : Object.keys(shows)[0]
+        
+        inst.log('debug', `Found ${Object.keys(shows).length} Shows. Primary Show ID: ${inst.data.primaryShowId}`)
+    } else {
+        inst.data.primaryShowId = null
+        inst.log('warn', 'No Shows found')
     }
-    // if engines request fails
-    else {
-        // reset polling duration
-        inst.data.module.updateEnginesDuration = 0
 
-        // empty engines object
-        inst.data.engines = {}
+    // ========== BUILD RUNDOWN-TO-SHOW MAP ==========
+    // This map is critical for rundown button triggers
+    // Check BOTH running (from /launcher) and started (from /lino/engines)
+    inst.data.rundownToShowMap = {}
+    for (const [showId, show] of Object.entries(shows)) {
+        const isActive = show.running || show.started
+        if (isActive && show.loadedRundowns) {
+            for (const rd of show.loadedRundowns) {
+                inst.data.rundownToShowMap[rd.id] = showId
+            }
+        }
+    }
+    inst.log('debug', `Rundown-to-Show map: ${JSON.stringify(inst.data.rundownToShowMap)}`)
 
-        // get variable definitions and values
+    // Also maintain linoEngines for backward compatibility
+    inst.data.linoEngines = {}
+    for (const [showId, show] of Object.entries(shows)) {
+        inst.data.linoEngines[showId] = {
+            name: show.name,
+            started: show.running,
+            mode: show.mode,
+            loadedRundowns: show.loadedRundowns,
+            realityEngines: show.renderers.map(r => ({ id: r.engineHostId, name: r.engineHostName }))
+        }
+    }
+    inst.data.linoEngineId = inst.data.primaryShowId
+
+    // Save elapsed time
+    inst.data.module.updateEnginesDuration = Date.now() - start
+
+    // Update data if changed
+    const enginesChanged = !isEqual(inst.data.engines, engines)
+    const showsChanged = !isEqual(inst.data.shows, shows)
+
+    if (enginesChanged || showsChanged) {
+        // Save new data
+        inst.data.engines = engines
+        inst.data.shows = shows
+
+        // Get variable definitions and values
         const [def, val] = getVariables(inst)
 
-        // set variable definitions
-        inst.setVariableDefinitions(def)
+        // Set variable definitions if necessary
+        if (setDefinitions) inst.setVariableDefinitions(def)
 
-        // set variable values
+        // Set variable values
         inst.updateVariables(val)
+        
+        inst.log('info', `Updated: ${Object.keys(engines).length} Reality Engines, ${Object.keys(shows).length} Shows`)
+    } else {
+        // Only update duration variable
+        inst.updateVariables({ updateEnginesDuration: `${ms2S(inst.data.module.updateEnginesDuration)}s` })
     }
 
-    // indicate inavtive engine loading
+    // Indicate inactive engine loading
     inst.data.module.updateEnginesData = false
 
-    // update data loading feedback
+    // Update data loading feedback
     inst.checkFeedbacks('basicFeatureDataLoading')
 }

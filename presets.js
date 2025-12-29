@@ -255,11 +255,20 @@ export const getPresets = (inst) => {
         })
     }
 
-    // append rundown presets
+    // append rundown presets (only for rundowns loaded on running shows)
     if (inst.data.rundowns && Object.keys(inst.data.rundowns).length > 0) {
         let rundownPresetsCount = 0
+        const shows = inst.data.shows || {}
+        
         // loop over all rundowns
         for (const [rID, rundown] of Object.entries(inst.data.rundowns)) {
+            // Get show info for category naming
+            const showId = rundown.showId || rundown.linoEngineId
+            const show = showId ? shows[showId] : null
+            const showName = show ? show.name : 'Unknown'
+            const isShowActive = show?.running || show?.started
+            const categoryPrefix = isShowActive ? '🟢' : '⚪'
+            
             // loop over all items in rundown
             if (rundown.items) {
                 for (const [iID, itemData] of Object.entries(rundown.items)) {
@@ -269,8 +278,8 @@ export const getPresets = (inst) => {
                             // if button is valid add preset
                             if (buttonLabel !== undefined) {
                                 presets.push({
-                                    category: 'Rundown: ' + rundown.name,
-                                    name: `Rundown ${rundown.name} - Item ${itemData.name} - ${buttonLabel}`,
+                                    category: `Rundown: ${rundown.name}`,
+                                    name: `${itemData.name} - ${buttonLabel}`,
                                     type: 'button',
                                     style: {
                                         text: buttonLabel,
@@ -314,13 +323,197 @@ export const getPresets = (inst) => {
                 }
             }
         }
-        inst.log('debug', `Generated ${rundownPresetsCount} rundown presets`)
+        inst.log('debug', `Generated ${rundownPresetsCount} rundown presets from ${Object.keys(inst.data.rundowns).length} rundowns`)
+        
+        // Add rundown item PLAYBACK control presets (Play/Out/Continue for each item)
+        // These go in a separate "Lino Playback: {rundown}" category
+        let controlPresetsCount = 0
+        for (const [rID, rundown] of Object.entries(inst.data.rundowns)) {
+            const playbackCategory = `Lino Playback: ${rundown.name}`
+            
+            // Play Next buttons at the top
+            presets.push({
+                category: playbackCategory,
+                name: `NEXT → Program`,
+                type: 'button',
+                style: {
+                    text: `▶▶ NEXT\\nPROGRAM`,
+                    size: '14',
+                    color: combineRgb(255, 255, 255),
+                    bgcolor: combineRgb(204, 0, 0)
+                },
+                steps: [{
+                    down: [{
+                        actionId: 'rundownPlayNext',
+                        options: {
+                            rundown: `r${rID}`,
+                            channel: '0'
+                        }
+                    }]
+                }],
+                feedbacks: []
+            })
+            
+            presets.push({
+                category: playbackCategory,
+                name: `NEXT → Preview`,
+                type: 'button',
+                style: {
+                    text: `▶▶ NEXT\\nPREVIEW`,
+                    size: '14',
+                    color: combineRgb(255, 255, 255),
+                    bgcolor: combineRgb(0, 153, 0)
+                },
+                steps: [{
+                    down: [{
+                        actionId: 'rundownPlayNext',
+                        options: {
+                            rundown: `r${rID}`,
+                            channel: '1'
+                        }
+                    }]
+                }],
+                feedbacks: []
+            })
+            controlPresetsCount += 2
+            
+            // Add presets for each item
+            if (rundown.items) {
+                for (const [iID, itemData] of Object.entries(rundown.items)) {
+                    const itemLabel = itemData.name || `Item #${iID}`
+                    const shortLabel = itemLabel.length > 10 ? itemLabel.substring(0, 8) + '..' : itemLabel
+                    
+                    // Play to Preview (green - like in RealityHub UI)
+                    presets.push({
+                        category: playbackCategory,
+                        name: `${itemLabel} → Preview`,
+                        type: 'button',
+                        style: {
+                            text: `▶ PVW\\n${shortLabel}`,
+                            size: '14',
+                            color: combineRgb(255, 255, 255),
+                            bgcolor: combineRgb(0, 128, 0)
+                        },
+                        steps: [{
+                            down: [{
+                                actionId: 'rundownItemPlay',
+                                options: {
+                                    rundown: `r${rID}`,
+                                    [`r${rID}`]: `r${rID}_i${iID}`,
+                                    channel: '1'
+                                }
+                            }]
+                        }],
+                        feedbacks: []
+                    })
+                    
+                    // Out from Preview
+                    presets.push({
+                        category: playbackCategory,
+                        name: `${itemLabel} OUT Preview`,
+                        type: 'button',
+                        style: {
+                            text: `■ PVW\\n${shortLabel}`,
+                            size: '14',
+                            color: combineRgb(255, 255, 255),
+                            bgcolor: combineRgb(0, 80, 0)
+                        },
+                        steps: [{
+                            down: [{
+                                actionId: 'rundownItemOut',
+                                options: {
+                                    rundown: `r${rID}`,
+                                    [`r${rID}`]: `r${rID}_i${iID}`,
+                                    channel: '1'
+                                }
+                            }]
+                        }],
+                        feedbacks: []
+                    })
+                    
+                    // Play to Program (red - like in RealityHub UI)
+                    presets.push({
+                        category: playbackCategory,
+                        name: `${itemLabel} → Program`,
+                        type: 'button',
+                        style: {
+                            text: `▶ PGM\\n${shortLabel}`,
+                            size: '14',
+                            color: combineRgb(255, 255, 255),
+                            bgcolor: combineRgb(180, 0, 0)
+                        },
+                        steps: [{
+                            down: [{
+                                actionId: 'rundownItemPlay',
+                                options: {
+                                    rundown: `r${rID}`,
+                                    [`r${rID}`]: `r${rID}_i${iID}`,
+                                    channel: '0'
+                                }
+                            }]
+                        }],
+                        feedbacks: []
+                    })
+                    
+                    // Out from Program
+                    presets.push({
+                        category: playbackCategory,
+                        name: `${itemLabel} OUT Program`,
+                        type: 'button',
+                        style: {
+                            text: `■ PGM\\n${shortLabel}`,
+                            size: '14',
+                            color: combineRgb(255, 255, 255),
+                            bgcolor: combineRgb(100, 0, 0)
+                        },
+                        steps: [{
+                            down: [{
+                                actionId: 'rundownItemOut',
+                                options: {
+                                    rundown: `r${rID}`,
+                                    [`r${rID}`]: `r${rID}_i${iID}`,
+                                    channel: '0'
+                                }
+                            }]
+                        }],
+                        feedbacks: []
+                    })
+                    
+                    // Continue (yellow - for animation continue)
+                    presets.push({
+                        category: playbackCategory,
+                        name: `${itemLabel} Continue`,
+                        type: 'button',
+                        style: {
+                            text: `⏯ CONT\\n${shortLabel}`,
+                            size: '14',
+                            color: combineRgb(0, 0, 0),
+                            bgcolor: combineRgb(255, 200, 0)
+                        },
+                        steps: [{
+                            down: [{
+                                actionId: 'rundownItemContinue',
+                                options: {
+                                    rundown: `r${rID}`,
+                                    [`r${rID}`]: `r${rID}_i${iID}`,
+                                    channel: '0'
+                                }
+                            }]
+                        }],
+                        feedbacks: []
+                    })
+                    
+                    controlPresetsCount += 5
+                }
+            }
+            inst.log('info', `Created ${controlPresetsCount} Lino playback presets for rundown "${rundown.name}"`)
+        }
     } else {
         inst.log('debug', 'No rundown data available for presets')
     }
 
     // append template presets
-    if (Object.keys(inst.data.templates).length > 0) {
+    if (inst.data.templates && Object.keys(inst.data.templates).length > 0) {
         const rID = Object.keys(inst.data.templates)[0]
         const templates = inst.data.templates[rID]
 

@@ -1,7 +1,7 @@
 // actions
 
 import { nodeFunctionsOptions, nodePropertiesOptions } from './features/nodes.js'
-import { rundownButtonOptions } from './features/rundowns.js'
+import { rundownButtonOptions, rundownItemOptions, rundownPlayNextOptions } from './features/rundowns.js'
 import { templateButtonOptions } from './features/templates.js'
 import { sString, contains, deepSetProperty, featureInactive, convertToFunctionId, featureLogic } from './tools.js'
 import { engineSelection } from './features/engines.js'
@@ -631,6 +631,18 @@ function createActions(inst) {
         rundownButtonPress: featureInactive(
             'Rundowns', 'Rundown: Button Press (INACTIVE!)', 'Trigger any button from selected rundowns'
         ),
+        rundownItemPlay: featureInactive(
+            'Rundowns', 'Rundown: Play Item (INACTIVE!)', 'Play a rundown item to Program or Preview'
+        ),
+        rundownItemOut: featureInactive(
+            'Rundowns', 'Rundown: Out Item (INACTIVE!)', 'Take out a rundown item from Program or Preview'
+        ),
+        rundownItemContinue: featureInactive(
+            'Rundowns', 'Rundown: Continue Item (INACTIVE!)', 'Continue animation of a rundown item'
+        ),
+        rundownPlayNext: featureInactive(
+            'Rundowns', 'Rundown: Play Next (INACTIVE!)', 'Play the next item in the rundown'
+        ),
         templateButtonPress: featureInactive(
             'Templates', 'Template: Button Press (INACTIVE!)', 'Trigger any button from selected template'
         ),
@@ -704,28 +716,177 @@ function createActions(inst) {
     }
 
     // set rundown actions if feature selected
+    // Only show rundowns that are loaded on running shows
     if (contains(inst.config.features, 'rundowns') && Object.keys(inst.data.rundowns).length > 0) {
 
         actions.rundownButtonPress = {
             name: 'Rundown: Button Press',
-            description: 'Trigger any button from selected rundowns',
-            options: rundownButtonOptions(inst.data.rundowns),
+            description: 'Trigger any button from rundowns loaded on running shows',
+            options: rundownButtonOptions(inst.data.rundowns, inst.data.rundownToShowMap, inst.data.shows),
             callback: async (event) => {
                 const parts = event.options[event.options[event.options.rundown]].split('_')
                 const rID = parts[0]
                 const iID = parts[1]
                 const bID = parts.slice(2).join('_')
                 
-                // Get the Lino engine ID associated with this rundown
+                // Get the Show ID associated with this rundown
                 const rundownId = rID.substring(1)
                 const rundown = inst.data.rundowns[rundownId]
-                if (!rundown || !rundown.linoEngineId) {
-                    inst.log('error', `Cannot trigger button: No Lino engine ID for rundown ${rundownId}`)
+                
+                // Use showId (preferred) or fall back to linoEngineId (backward compat)
+                const showId = rundown?.showId || rundown?.linoEngineId
+                if (!rundown || !showId) {
+                    inst.log('error', `Cannot trigger button: No Show ID for rundown ${rundownId}`)
                     return
                 }
                 
-                // Lino API: POST /api/rest/v1/lino/rundown/{engineId}/{rundownId}/items/{itemId}/buttons/{buttonKey}
-                inst.POST(`lino/rundown/${rundown.linoEngineId}/${rundownId}/items/${iID.substring(1)}/buttons/${sString(bID.substring(1))}`)
+                // Verify the show is still running (check both running and started)
+                const show = inst.data.shows?.[showId]
+                const isShowActive = show?.running || show?.started
+                if (!isShowActive) {
+                    inst.log('warn', `Show "${show?.name || showId}" is not running. Button may not work.`)
+                }
+                
+                const itemId = iID.substring(1)
+                const buttonKey = bID.substring(1)
+                const endpoint = `lino/rundown/${showId}/${rundownId}/items/${itemId}/buttons/${sString(buttonKey)}`
+                
+                inst.log('debug', `Triggering button: Show="${show?.name}" (ID=${showId}), Rundown="${rundown.name}" (ID=${rundownId}), Item=${itemId}, Button=${buttonKey}`)
+                
+                // Lino API: POST /api/rest/v1/lino/rundown/{showId}/{rundownId}/items/{itemId}/buttons/{buttonKey}
+                const response = await inst.POST(endpoint)
+                if (response === null) {
+                    inst.log('warn', `Button trigger may have failed for: ${endpoint}`)
+                }
+            }
+        }
+
+        // Helper function to parse rundown item selection
+        const parseRundownItemSelection = (event) => {
+            // Parse the item selection: "r{rundownId}_i{itemId}"
+            const itemSelection = event.options[event.options.rundown]
+            if (!itemSelection) return null
+            
+            const parts = itemSelection.split('_')
+            const rundownId = parts[0].substring(1) // Remove 'r' prefix
+            const itemId = parts[1].substring(1) // Remove 'i' prefix
+            
+            const rundown = inst.data.rundowns[rundownId]
+            const showId = rundown?.showId || rundown?.linoEngineId
+            const show = inst.data.shows?.[showId]
+            const channel = event.options.channel || '0'
+            
+            return { rundownId, itemId, showId, show, rundown, channel }
+        }
+
+        // Play Item: PUT /lino/rundown/{showId}/play/{itemId}/{preview}
+        actions.rundownItemPlay = {
+            name: 'Rundown: Play Item',
+            description: 'Play a rundown item to Program (PGM) or Preview (PVW)',
+            options: rundownItemOptions(inst.data.rundowns, inst.data.rundownToShowMap, inst.data.shows),
+            callback: async (event) => {
+                const parsed = parseRundownItemSelection(event)
+                if (!parsed || !parsed.showId) {
+                    inst.log('error', 'Cannot play item: Invalid selection')
+                    return
+                }
+                
+                const { showId, itemId, show, rundown, channel } = parsed
+                const channelName = channel === '1' ? 'Preview' : 'Program'
+                const endpoint = `lino/rundown/${showId}/play/${itemId}/${channel}`
+                
+                inst.log('debug', `Playing item to ${channelName}: Show="${show?.name}", Item=${itemId}`)
+                
+                const response = await inst.PUT(endpoint)
+                if (response === null) {
+                    inst.log('warn', `Play item may have failed for: ${endpoint}`)
+                }
+            }
+        }
+
+        // Out Item: PUT /lino/rundown/{showId}/out/{itemId}/{preview}
+        actions.rundownItemOut = {
+            name: 'Rundown: Out Item',
+            description: 'Take out a rundown item from Program (PGM) or Preview (PVW)',
+            options: rundownItemOptions(inst.data.rundowns, inst.data.rundownToShowMap, inst.data.shows),
+            callback: async (event) => {
+                const parsed = parseRundownItemSelection(event)
+                if (!parsed || !parsed.showId) {
+                    inst.log('error', 'Cannot out item: Invalid selection')
+                    return
+                }
+                
+                const { showId, itemId, show, channel } = parsed
+                const channelName = channel === '1' ? 'Preview' : 'Program'
+                const endpoint = `lino/rundown/${showId}/out/${itemId}/${channel}`
+                
+                inst.log('debug', `Taking out item from ${channelName}: Show="${show?.name}", Item=${itemId}`)
+                
+                const response = await inst.PUT(endpoint)
+                if (response === null) {
+                    inst.log('warn', `Out item may have failed for: ${endpoint}`)
+                }
+            }
+        }
+
+        // Continue Item: PUT /lino/rundown/{showId}/continue/{itemId}/{preview}
+        actions.rundownItemContinue = {
+            name: 'Rundown: Continue Item',
+            description: 'Continue animation of a rundown item on Program (PGM) or Preview (PVW)',
+            options: rundownItemOptions(inst.data.rundowns, inst.data.rundownToShowMap, inst.data.shows),
+            callback: async (event) => {
+                const parsed = parseRundownItemSelection(event)
+                if (!parsed || !parsed.showId) {
+                    inst.log('error', 'Cannot continue item: Invalid selection')
+                    return
+                }
+                
+                const { showId, itemId, show, channel } = parsed
+                const channelName = channel === '1' ? 'Preview' : 'Program'
+                const endpoint = `lino/rundown/${showId}/continue/${itemId}/${channel}`
+                
+                inst.log('debug', `Continuing item on ${channelName}: Show="${show?.name}", Item=${itemId}`)
+                
+                const response = await inst.PUT(endpoint)
+                if (response === null) {
+                    inst.log('warn', `Continue item may have failed for: ${endpoint}`)
+                }
+            }
+        }
+
+        // Play Next: PUT /lino/rundown/{showId}/playnext/{preview}
+        actions.rundownPlayNext = {
+            name: 'Rundown: Play Next',
+            description: 'Play the next item in the rundown to Program (PGM) or Preview (PVW)',
+            options: rundownPlayNextOptions(inst.data.rundowns, inst.data.rundownToShowMap, inst.data.shows),
+            callback: async (event) => {
+                // Get Show ID from rundown selection
+                const rundownSelection = event.options.rundown
+                if (!rundownSelection) {
+                    inst.log('error', 'Cannot play next: No rundown selected')
+                    return
+                }
+                
+                const rundownId = rundownSelection.substring(1) // Remove 'r' prefix
+                const rundown = inst.data.rundowns[rundownId]
+                const showId = rundown?.showId || rundown?.linoEngineId
+                const show = inst.data.shows?.[showId]
+                const channel = event.options.channel || '0'
+                const channelName = channel === '1' ? 'Preview' : 'Program'
+                
+                if (!showId) {
+                    inst.log('error', 'Cannot play next: No Show ID for rundown')
+                    return
+                }
+                
+                const endpoint = `lino/rundown/${showId}/playnext/${channel}`
+                
+                inst.log('debug', `Playing next item to ${channelName}: Show="${show?.name}"`)
+                
+                const response = await inst.PUT(endpoint)
+                if (response === null) {
+                    inst.log('warn', `Play next may have failed for: ${endpoint}`)
+                }
             }
         }
     }
@@ -752,7 +913,17 @@ function createActions(inst) {
                     return
                 }
                 
-                inst.POST(`lino/rundown/${linoEngineId}/${rundownId}/items/${iID.substring(1)}/buttons/${sString(bID.substring(1))}`)
+                const itemId = iID.substring(1)
+                const buttonKey = bID.substring(1)
+                const endpoint = `lino/rundown/${linoEngineId}/${rundownId}/items/${itemId}/buttons/${sString(buttonKey)}`
+                
+                inst.log('debug', `Triggering template button: Show ID=${linoEngineId}, Rundown=${rundownId}, Item=${itemId}, Button=${buttonKey}`)
+                
+                // Lino API: POST /api/rest/v1/lino/rundown/{engineId}/{rundownId}/items/{itemId}/buttons/{buttonKey}
+                const response = await inst.POST(endpoint)
+                if (response === null) {
+                    inst.log('warn', `Template button trigger may have failed for: ${endpoint}`)
+                }
             }
         }
     }
