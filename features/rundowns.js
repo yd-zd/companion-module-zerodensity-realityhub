@@ -257,87 +257,109 @@ export const loadRundowns = async (inst) => {
         return
     }
 
-    // Get running shows (check both running from /launcher and started from /lino/engines)
-    const runningShows = Object.entries(shows).filter(([id, s]) => s.running || s.started)
+    // Get ALL shows that have loaded rundowns (regardless of running status)
+    // Apply show filter if configured
+    const showFilterStr = inst.config.showFilter || ''
+    const showFilter = showFilterStr.split(',').map(s => s.trim()).filter(s => s !== '')
+    const hasFilter = showFilter.length > 0
+
+    const targetShows = Object.entries(shows).filter(([id, show]) => {
+        // Must have loaded rundowns
+        if (!show.loadedRundowns || show.loadedRundowns.length === 0) return false
+        
+        if (hasFilter) {
+            // Strict filtering: only include shows matching the filter (ID or Name)
+            return showFilter.includes(String(id)) || showFilter.includes(show.name)
+        }
+        // Default: include ALL shows with loaded rundowns
+        return true
+    })
     
-    if (runningShows.length === 0) {
-        inst.log('warn', 'Skipping rundown update: No Shows are currently running')
+    if (targetShows.length === 0) {
+        const msg = hasFilter 
+            ? 'Skipping rundown update: No shows match the configured filter' 
+            : 'Skipping rundown update: No shows have loaded rundowns'
+        inst.log('warn', msg)
         inst.data.module.updateRundownsData = false
         return
     }
     
-    const runningShowIds = runningShows.map(([id]) => id)
-    inst.log('debug', `Querying rundowns for ${runningShows.length} running Show(s): ${runningShowIds.join(', ')}`)
+    const targetShowIds = targetShows.map(([id]) => id)
+    inst.log('info', `Querying rundowns for ${targetShows.length} show(s) with loaded rundowns: ${targetShowIds.join(', ')}`)
 
-    // Get all loaded rundown IDs from running shows
+    // Build a map of rundown ID -> show ID from loadedRundownsInfo
+    // Note: loadedRundownsInfo only contains { id }, not { id, name }
     const loadedRundownIds = new Set()
-    for (const [showId, show] of runningShows) {
+    const rundownToShow = {}  // Maps rundownId -> { showId, showName }
+    for (const [showId, show] of targetShows) {
         for (const rd of (show.loadedRundowns || [])) {
             loadedRundownIds.add(rd.id)
+            rundownToShow[rd.id] = { showId, showName: show.name }
         }
     }
-    inst.log('debug', `Found ${loadedRundownIds.size} rundowns loaded on running shows: ${[...loadedRundownIds].join(', ')}`)
+    inst.log('info', `Found ${loadedRundownIds.size} rundowns from loadedRundownsInfo: ${[...loadedRundownIds].join(', ')}`)
 
-    // Use first running show to get rundown list (API returns all rundowns anyway)
-    const primaryShowId = runningShowIds[0]
-    const rundownsData = await inst.GET(`lino/rundowns/${primaryShowId}`, {}, 'medium')
+    // Query rundowns API to get full rundown details (including names)
+    // Use /lino/rundowns (without showId) to get ALL rundowns across all shows
+    const rundownsData = await inst.GET('lino/rundowns', {}, 'medium')
+    
+    if (rundownsData === null || !Array.isArray(rundownsData)) {
+        inst.log('warn', 'Failed to fetch rundowns from API')
+        inst.data.module.updateRundownsData = false
+        return
+    }
+    
+    // Filter to only rundowns that are loaded on our target shows
+    const loadedRundowns = rundownsData.filter(rd => loadedRundownIds.has(rd.id))
+    inst.log('info', `Filtered to ${loadedRundowns.length} loaded rundowns out of ${rundownsData.length} total from API`)
+    
+    totalSteps = loadedRundowns.length + 1
 
-    if (rundownsData !== null && Array.isArray(rundownsData)) {
-        // Filter to only rundowns that are loaded on running shows
-        const loadedRundowns = rundownsData.filter(rd => loadedRundownIds.has(rd.id))
+    for (const rundown of loadedRundowns) {
+        const rundownKey = rundown.id
+        const showInfo = rundownToShow[rundown.id] || { showId: targetShowIds[0], showName: 'Unknown' }
+        const showId = showInfo.showId
         
-        inst.log('debug', `Filtered to ${loadedRundowns.length} loaded rundowns out of ${rundownsData.length} total`)
-        
-        totalSteps = loadedRundowns.length + 1
+        // Create rundown entry using name from API response
+        rundowns[rundownKey] = {
+            name: rundown.name,  // Get name from API, not from loadedRundownsInfo
+            showId: showId,
+            showName: showInfo.showName,
+            linoEngineId: showId,
+            items: {}
+        }
 
-        for (const rundown of loadedRundowns) {
-            const rundownKey = rundown.id
-            
-            // Get the Show ID for this rundown from our map
-            const showId = rundownToShowMap[rundown.id] || primaryShowId
-            const show = shows[showId]
-            
-            // Create rundown entry
-            rundowns[rundownKey] = {
-                name: rundown.name,
-                showId: showId,  // Store Show ID for button triggers
-                showName: show ? show.name : 'Unknown',
-                linoEngineId: showId, // Backward compatibility (linoEngineId = showId)
-                items: {}
-            }
+        // Request items for this rundown using correct Show ID
+        const itemsData = await inst.GET(`lino/rundown/${showId}/${rundown.id}/items/`, {}, 'medium')
 
-            // Request items for this rundown using correct Show ID
-            const itemsData = await inst.GET(`lino/rundown/${showId}/${rundown.id}/items/`, {}, 'medium')
+        if (itemsData !== null && Array.isArray(itemsData)) {
+            for (const item of itemsData) {
+                const itemId = item.id
+                
+                rundowns[rundownKey].items[itemId] = {
+                    name: item.name,
+                    template: item.template || null,
+                    buttons: {}
+                }
 
-            if (itemsData !== null && Array.isArray(itemsData)) {
-                for (const item of itemsData) {
-                    const itemId = item.id
-                    
-                    rundowns[rundownKey].items[itemId] = {
-                        name: item.name,
-                        template: item.template || null,
-                        buttons: {}
-                    }
-
-                    // Update button labels
-                    if (item.buttons) {
-                        for (const [key, label] of Object.entries(item.buttons)) {
-                            rundowns[rundownKey].items[itemId].buttons[key] = label || key
-                        }
+                // Update button labels
+                if (item.buttons) {
+                    for (const [key, label] of Object.entries(item.buttons)) {
+                        rundowns[rundownKey].items[itemId].buttons[key] = label || key
                     }
                 }
-                
-                inst.log('debug', `Loaded ${Object.keys(rundowns[rundownKey].items).length} items for rundown "${rundown.name}" (Show: ${show?.name || showId})`)
-            } else {
-                inst.log('debug', `No items found for rundown "${rundown.name}" (ID: ${rundown.id}) on Show ${showId}`)
             }
-
-            // Update progress
-            currentStep++
-            inst.data.module.updateRundownsProgress = Math.floor(100 * currentStep / totalSteps)
-            inst.updateVariables({ updateRundownsProgress: inst.data.module.updateRundownsProgress + '%' })
-            if (!inst.moduleInitiated) inst.updateStatus('LOAD: Rundowns data ...', inst.data.module.updateRundownsProgress + '%')
+            
+            inst.log('info', `Loaded ${Object.keys(rundowns[rundownKey].items).length} items for rundown "${rundown.name}" (Show: ${showInfo.showName})`)
+        } else {
+            inst.log('warn', `No items found for rundown "${rundown.name}" (ID: ${rundown.id}) on Show ${showId}`)
         }
+
+        // Update progress
+        currentStep++
+        inst.data.module.updateRundownsProgress = Math.floor(100 * currentStep / totalSteps)
+        inst.updateVariables({ updateRundownsProgress: inst.data.module.updateRundownsProgress + '%' })
+        if (!inst.moduleInitiated) inst.updateStatus('LOAD: Rundowns data ...', inst.data.module.updateRundownsProgress + '%')
     }
 
     if (inst.enableRequests === false) {

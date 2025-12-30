@@ -265,9 +265,9 @@ export const getPresets = (inst) => {
             // Get show info for category naming
             const showId = rundown.showId || rundown.linoEngineId
             const show = showId ? shows[showId] : null
-            const showName = show ? show.name : 'Unknown'
+            const showName = rundown.showName || (show ? show.name : 'Unknown')
             const isShowActive = show?.running || show?.started
-            const categoryPrefix = isShowActive ? '🟢' : '⚪'
+            const showPrefix = isShowActive ? `🟢 ${showName}` : `⚪ ${showName}`
             
             // loop over all items in rundown
             if (rundown.items) {
@@ -278,7 +278,7 @@ export const getPresets = (inst) => {
                             // if button is valid add preset
                             if (buttonLabel !== undefined) {
                                 presets.push({
-                                    category: `Rundown: ${rundown.name}`,
+                                    category: `${showPrefix} > ${rundown.name}`,
                                     name: `${itemData.name} - ${buttonLabel}`,
                                     type: 'button',
                                     style: {
@@ -326,15 +326,23 @@ export const getPresets = (inst) => {
         inst.log('debug', `Generated ${rundownPresetsCount} rundown presets from ${Object.keys(inst.data.rundowns).length} rundowns`)
         
         // Add rundown item PLAYBACK control presets (Play/Out/Continue for each item)
-        // These go in a separate "Lino Playback: {rundown}" category
+        // Organized by show > rundown > item
         let controlPresetsCount = 0
         for (const [rID, rundown] of Object.entries(inst.data.rundowns)) {
-            const playbackCategory = `Lino Playback: ${rundown.name}`
+            // Get show info for category naming
+            const showId = rundown.showId || rundown.linoEngineId
+            const show = showId ? shows[showId] : null
+            const showName = rundown.showName || (show ? show.name : 'Unknown')
+            const isShowActive = show?.running || show?.started
+            const showPrefix = isShowActive ? `🟢 ${showName}` : `⚪ ${showName}`
             
-            // Play Next buttons at the top
+            // Global rundown controls category
+            const globalCategory = `${showPrefix} > ${rundown.name}: 🎬 Controls`
+            
+            // Play Next buttons in global controls
             presets.push({
-                category: playbackCategory,
-                name: `NEXT → Program`,
+                category: globalCategory,
+                name: `Play Next → Program`,
                 type: 'button',
                 style: {
                     text: `▶▶ NEXT\\nPROGRAM`,
@@ -355,8 +363,8 @@ export const getPresets = (inst) => {
             })
             
             presets.push({
-                category: playbackCategory,
-                name: `NEXT → Preview`,
+                category: globalCategory,
+                name: `Play Next → Preview`,
                 type: 'button',
                 style: {
                     text: `▶▶ NEXT\\nPREVIEW`,
@@ -375,21 +383,70 @@ export const getPresets = (inst) => {
                 }],
                 feedbacks: []
             })
-            controlPresetsCount += 2
             
-            // Add presets for each item
+            // ALL OUT buttons (Program All Out / Preview All Out)
+            presets.push({
+                category: globalCategory,
+                name: `ALL OUT ← Program`,
+                type: 'button',
+                style: {
+                    text: `■ ALL\\nPROGRAM`,
+                    size: '14',
+                    color: combineRgb(0, 0, 0),
+                    bgcolor: combineRgb(255, 180, 0)  // Orange-yellow like RealityHub
+                },
+                steps: [{
+                    down: [{
+                        actionId: 'rundownAllOut',
+                        options: {
+                            rundown: `r${rID}`,
+                            channel: '0'
+                        }
+                    }]
+                }],
+                feedbacks: []
+            })
+            
+            presets.push({
+                category: globalCategory,
+                name: `ALL OUT ← Preview`,
+                type: 'button',
+                style: {
+                    text: `■ ALL\\nPREVIEW`,
+                    size: '14',
+                    color: combineRgb(0, 0, 0),
+                    bgcolor: combineRgb(200, 150, 0)  // Darker orange-yellow
+                },
+                steps: [{
+                    down: [{
+                        actionId: 'rundownAllOut',
+                        options: {
+                            rundown: `r${rID}`,
+                            channel: '1'
+                        }
+                    }]
+                }],
+                feedbacks: []
+            })
+            controlPresetsCount += 4
+            
+            // Add presets for each item - each item gets its own category
             if (rundown.items) {
                 for (const [iID, itemData] of Object.entries(rundown.items)) {
                     const itemLabel = itemData.name || `Item #${iID}`
-                    const shortLabel = itemLabel.length > 10 ? itemLabel.substring(0, 8) + '..' : itemLabel
+                    // Create category per item: "ShowName > RundownName: ItemName"
+                    const itemCategory = `${showPrefix} > ${rundown.name}: ${itemLabel}`
+                    
+                    // Shorten item name for button display (max ~10 chars)
+                    const shortName = itemLabel.length > 10 ? itemLabel.substring(0, 9) + '…' : itemLabel
                     
                     // Play to Preview (green - like in RealityHub UI)
                     presets.push({
-                        category: playbackCategory,
-                        name: `${itemLabel} → Preview`,
+                        category: itemCategory,
+                        name: `Play → Preview`,
                         type: 'button',
                         style: {
-                            text: `▶ PVW\\n${shortLabel}`,
+                            text: `${shortName}\\n▶ PVW`,
                             size: '14',
                             color: combineRgb(255, 255, 255),
                             bgcolor: combineRgb(0, 128, 0)
@@ -409,11 +466,11 @@ export const getPresets = (inst) => {
                     
                     // Out from Preview
                     presets.push({
-                        category: playbackCategory,
-                        name: `${itemLabel} OUT Preview`,
+                        category: itemCategory,
+                        name: `Out ← Preview`,
                         type: 'button',
                         style: {
-                            text: `■ PVW\\n${shortLabel}`,
+                            text: `${shortName}\\n■ PVW`,
                             size: '14',
                             color: combineRgb(255, 255, 255),
                             bgcolor: combineRgb(0, 80, 0)
@@ -433,11 +490,11 @@ export const getPresets = (inst) => {
                     
                     // Play to Program (red - like in RealityHub UI)
                     presets.push({
-                        category: playbackCategory,
-                        name: `${itemLabel} → Program`,
+                        category: itemCategory,
+                        name: `Play → Program`,
                         type: 'button',
                         style: {
-                            text: `▶ PGM\\n${shortLabel}`,
+                            text: `${shortName}\\n▶ PGM`,
                             size: '14',
                             color: combineRgb(255, 255, 255),
                             bgcolor: combineRgb(180, 0, 0)
@@ -457,11 +514,11 @@ export const getPresets = (inst) => {
                     
                     // Out from Program
                     presets.push({
-                        category: playbackCategory,
-                        name: `${itemLabel} OUT Program`,
+                        category: itemCategory,
+                        name: `Out ← Program`,
                         type: 'button',
                         style: {
-                            text: `■ PGM\\n${shortLabel}`,
+                            text: `${shortName}\\n■ PGM`,
                             size: '14',
                             color: combineRgb(255, 255, 255),
                             bgcolor: combineRgb(100, 0, 0)
@@ -481,11 +538,11 @@ export const getPresets = (inst) => {
                     
                     // Continue (yellow - for animation continue)
                     presets.push({
-                        category: playbackCategory,
-                        name: `${itemLabel} Continue`,
+                        category: itemCategory,
+                        name: `Continue`,
                         type: 'button',
                         style: {
-                            text: `⏯ CONT\\n${shortLabel}`,
+                            text: `${shortName}\\n⏯ CONT`,
                             size: '14',
                             color: combineRgb(0, 0, 0),
                             bgcolor: combineRgb(255, 200, 0)

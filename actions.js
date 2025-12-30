@@ -889,6 +889,59 @@ function createActions(inst) {
                 }
             }
         }
+
+        // All Out: Out all items in a rundown from Program or Preview
+        actions.rundownAllOut = {
+            name: 'Rundown: All Out (Stop All)',
+            description: 'Take out (stop) ALL items in the rundown from Program (PGM) or Preview (PVW). This is like the "Program All Out" / "Preview All Out" buttons in RealityHub UI.',
+            options: rundownPlayNextOptions(inst.data.rundowns, inst.data.rundownToShowMap, inst.data.shows),
+            callback: async (event) => {
+                // Get Show ID from rundown selection
+                const rundownSelection = event.options.rundown
+                if (!rundownSelection) {
+                    inst.log('error', 'Cannot all-out: No rundown selected')
+                    return
+                }
+                
+                const rundownId = rundownSelection.substring(1) // Remove 'r' prefix
+                const rundown = inst.data.rundowns[rundownId]
+                const showId = rundown?.showId || rundown?.linoEngineId
+                const show = inst.data.shows?.[showId]
+                const channel = event.options.channel || '0'
+                const channelName = channel === '1' ? 'Preview' : 'Program'
+                
+                if (!showId) {
+                    inst.log('error', 'Cannot all-out: No Show ID for rundown')
+                    return
+                }
+                
+                if (!rundown?.items || Object.keys(rundown.items).length === 0) {
+                    inst.log('warn', 'No items in rundown to out')
+                    return
+                }
+                
+                inst.log('info', `All Out ${channelName}: Stopping all ${Object.keys(rundown.items).length} items in "${rundown.name}"`)
+                
+                // Call out for each item in the rundown
+                let successCount = 0
+                let failCount = 0
+                for (const itemId of Object.keys(rundown.items)) {
+                    const endpoint = `lino/rundown/${showId}/out/${itemId}/${channel}`
+                    try {
+                        const response = await inst.PUT(endpoint)
+                        if (response !== null) {
+                            successCount++
+                        } else {
+                            failCount++
+                        }
+                    } catch (e) {
+                        failCount++
+                    }
+                }
+                
+                inst.log('info', `All Out ${channelName}: ${successCount} succeeded, ${failCount} failed`)
+            }
+        }
     }
 
     // set template actions if feature selected

@@ -220,11 +220,18 @@ export const loadEngines = async (inst) => {
 
     // ========== BUILD RUNDOWN-TO-SHOW MAP ==========
     // This map is critical for rundown button triggers
-    // Check BOTH running (from /launcher) and started (from /lino/engines)
+    // Include ALL shows that have loadedRundowns (regardless of running status)
     inst.data.rundownToShowMap = {}
+    
+    // Log all shows for debugging
     for (const [showId, show] of Object.entries(shows)) {
-        const isActive = show.running || show.started
-        if (isActive && show.loadedRundowns) {
+        const status = (show.running || show.started) ? '🟢 RUNNING' : '⚪ STOPPED'
+        const rdCount = (show.loadedRundowns || []).length
+        const rdNames = (show.loadedRundowns || []).map(r => `${r.id}:${r.name}`).join(', ')
+        inst.log('debug', `Show ${showId} "${show.name}" ${status} - ${rdCount} rundowns: [${rdNames}]`)
+        
+        // Map ALL shows with loaded rundowns (not just running ones)
+        if (show.loadedRundowns && show.loadedRundowns.length > 0) {
             for (const rd of show.loadedRundowns) {
                 inst.data.rundownToShowMap[rd.id] = showId
             }

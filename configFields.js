@@ -42,6 +42,15 @@ export const createConfigFields = [
         tooltip: 'Select available features. More features, especially the "Nodes" feature, can be resource intensive but will add more functionality'
     },
     {
+        type: 'textinput',
+        id: 'showFilter',
+        label: 'Show Filter (Optional):',
+        width: 12,
+        default: '',
+        tooltip: 'Enter comma-separated Show IDs or Names to specifically select shows. If set, only rundowns from these shows will be loaded (even if the show is not running). Leave empty to load all running shows.',
+        isVisible: (options) => Array.isArray(options.features) && options.features.includes('rundowns')
+    },
+    {
         type: 'static-text',
         id: 'info-warning',
         width: 12,
