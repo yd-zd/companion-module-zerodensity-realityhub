@@ -389,15 +389,12 @@ class RealityHubInstance extends InstanceBase {
 		const parameters = {
 			responseType: 'json',
 			timeout: this.requestTimeout,
-			headers: {},
-            searchParams: {}
+			headers: {}
 		}
 
 		// add API key header if configured (for RealityHub 2.1+)
 		if (this.config.apiKey && this.config.apiKey.trim() !== '') {
 			parameters.headers['X-API-Key'] = this.config.apiKey.trim()
-            // Also add as query parameter for endpoints that might require it
-            parameters.searchParams['api_key'] = this.config.apiKey.trim()
 		}
 
 		// add body to "parameters" object if not empty
@@ -439,10 +436,7 @@ class RealityHubInstance extends InstanceBase {
 		finally {
 			// log request debug message if enabled
 			if (this.config.debugRequests === true) {
-                const searchParamsStr = parameters.searchParams && Object.keys(parameters.searchParams).length > 0 
-                    ? '?' + new URLSearchParams(parameters.searchParams).toString() 
-                    : '';
-                this.log('debug', `${method} request "${url}${searchParamsStr}"`)
+                this.log('debug', `${method} request "${url}"`)
             }
 
 			// return null if requests are not allowed

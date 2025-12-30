@@ -1,5 +1,37 @@
 # RealityHub Companion Module - Development Logbook
 
+## 2025-01-XX: Security Improvement - API Key Authentication Method
+
+### Security Enhancement
+
+#### Removed API Key from URL Query Parameters
+**Problem:** API keys were previously sent in URL query strings (`?api_key=...`), which poses security risks:
+- API keys can be logged in server access logs
+- URLs with API keys may appear in browser history
+- API keys can be exposed in error messages or network traces
+- Query parameters are more easily intercepted than headers
+
+**Solution:**
+- Removed API key from URL query string construction
+- API key now sent **only** via HTTP header (`X-API-Key`)
+- Follows security best practices for API authentication
+- More secure authentication method
+
+**Implementation:**
+- `index.js` - Removed query parameter construction for API key
+- Only sends `X-API-Key` header for authentication
+- All API requests now use header-based authentication exclusively
+
+### Backward Compatibility
+- RealityHub 2.1 API accepts API key in both header and query parameter
+- This change maintains full compatibility while improving security
+- No breaking changes for users
+
+### Files Changed
+- **`index.js`** - Removed API key from URL query parameters, header-only authentication
+
+---
+
 ## 2025-01-XX: Version 2.1.4 - HTTPS/SSL Support and Port Configuration
 
 ### Major Features Added
@@ -404,6 +436,8 @@ The module now sends the API key both as:
 2. Query Parameter: `?api_key={apiKey}`
 
 This matches the approach used in `rhub-mcp-server/index.js` for maximum compatibility across all RealityHub API endpoints.
+
+**Note:** This was later changed (2025-01-XX) to header-only authentication for improved security. See "Security Improvement - API Key Authentication Method" entry.
 
 ---
 
