@@ -603,6 +603,76 @@ function createFeedbacks(inst) {
         }
     }
 
+    // ========== LAUNCHER CONTROL FEEDBACKS ==========
+    // Show running status feedback - always available when we have show data
+    if (inst.data.shows && Object.keys(inst.data.shows).length > 0) {
+        // Create show selection dropdown for feedback
+        const showChoices = Object.entries(inst.data.shows).map(([showId, show]) => ({
+            id: showId,
+            label: show.name
+        }))
+        
+        // Show Running feedback - indicates if show is running
+        feedbacks.showRunning = {
+            type: 'boolean',
+            name: 'Launcher: Show is Running',
+            description: 'Changes button appearance when the selected show is RUNNING (green indicator)',
+            options: [
+                {
+                    type: 'dropdown',
+                    label: 'Show:',
+                    id: 'showId',
+                    default: showChoices[0]?.id || '',
+                    choices: showChoices
+                }
+            ],
+            defaultStyle: {
+                color: combineRgb(255, 255, 255),
+                bgcolor: combineRgb(0, 180, 0)  // Green when running
+            },
+            callback: (event) => {
+                const showId = event.options.showId
+                if (!showId) return false
+                
+                const show = inst.data.shows?.[showId]
+                if (!show) return false
+                
+                // Return TRUE if show IS RUNNING (to apply the green style)
+                return show.running || show.started
+            }
+        }
+        
+        // Show Stopped feedback - indicates if show is stopped
+        feedbacks.showStopped = {
+            type: 'boolean',
+            name: 'Launcher: Show is Stopped',
+            description: 'Changes button appearance when the selected show is STOPPED (gray indicator)',
+            options: [
+                {
+                    type: 'dropdown',
+                    label: 'Show:',
+                    id: 'showId',
+                    default: showChoices[0]?.id || '',
+                    choices: showChoices
+                }
+            ],
+            defaultStyle: {
+                color: combineRgb(200, 200, 200),
+                bgcolor: combineRgb(80, 80, 80)  // Gray when stopped
+            },
+            callback: (event) => {
+                const showId = event.options.showId
+                if (!showId) return false
+                
+                const show = inst.data.shows?.[showId]
+                if (!show) return true  // No show = treat as stopped
+                
+                // Return TRUE if show IS STOPPED (to apply the gray style)
+                return !show.running && !show.started
+            }
+        }
+    }
+
     return feedbacks
 }
 

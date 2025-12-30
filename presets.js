@@ -290,6 +290,135 @@ export const getPresets = (inst) => {
         })
     }
 
+    // ========== LAUNCH CONTROL PRESETS ==========
+    // Show start/stop buttons for shows with loaded rundowns (filtered by rundown filter)
+    if (inst.data.shows && Object.keys(inst.data.shows).length > 0) {
+        const shows = inst.data.shows
+        const rundowns = inst.data.rundowns || {}
+        const rundownToShowMap = inst.data.rundownToShowMap || {}
+        
+        // Get unique show IDs that have rundowns (respects the rundown filter)
+        const showIdsWithRundowns = new Set()
+        for (const [rID, rundown] of Object.entries(rundowns)) {
+            const showId = rundownToShowMap[rID] || rundown.showId || rundown.linoEngineId
+            if (showId) showIdsWithRundowns.add(showId)
+        }
+        
+        // Create Launch Control presets for each show with rundowns
+        for (const showId of showIdsWithRundowns) {
+            const show = shows[showId]
+            if (!show) continue
+            
+            const showName = show.name || `Show ${showId}`
+            const isActive = show.running || show.started
+            const statusIcon = isActive ? '🟢' : '⚪'
+            
+            // Category for this show's launch controls
+            const launchCategory = `🚀 Launch Control: ${showName}`
+            
+            // START button - Green, safe operation
+            presets.push({
+                category: launchCategory,
+                name: `▶ START`,
+                type: 'button',
+                style: {
+                    text: `▶ START\\n${showName}`,
+                    size: '14',
+                    color: combineRgb(255, 255, 255),
+                    bgcolor: combineRgb(0, 120, 0)  // Green
+                },
+                steps: [{
+                    down: [{
+                        actionId: 'launchShow',
+                        options: { showId: showId }
+                    }]
+                }],
+                feedbacks: [
+                    {
+                        feedbackId: 'showRunning',
+                        options: { showId: showId },
+                        style: {
+                            text: `✓ RUNNING\\n${showName}`,
+                            color: combineRgb(255, 255, 255),
+                            bgcolor: combineRgb(0, 180, 0)  // Bright green when running
+                        }
+                    }
+                ]
+            })
+            
+            // STOP button - HOLD 3 SECONDS to stop
+            // Uses Companion's "Run While Held" feature: only executes if held for full duration
+            presets.push({
+                category: launchCategory,
+                name: `⏹ HOLD 3s STOP`,
+                type: 'button',
+                style: {
+                    text: `⏹ HOLD 3s\\nTO STOP\\n${showName}`,
+                    size: '14',
+                    color: combineRgb(200, 200, 200),
+                    bgcolor: combineRgb(60, 60, 60)  // Gray when stopped
+                },
+                steps: [{
+                    down: [{
+                        actionId: 'stopShow',
+                        options: { showId: showId },
+                        delay: 3000,        // 3 second hold required
+                        runWhileHeld: true  // Only execute if still held after delay!
+                    }]
+                }],
+                feedbacks: [
+                    {
+                        feedbackId: 'showRunning',
+                        options: { showId: showId },
+                        style: {
+                            text: `⏹ HOLD 3s\\nTO STOP\\n⚠️ ${showName}`,
+                            color: combineRgb(255, 255, 255),
+                            bgcolor: combineRgb(180, 60, 0)  // Orange-red when running
+                        }
+                    }
+                ]
+            })
+            
+            // STATUS button - Display-only, shows current state
+            presets.push({
+                category: launchCategory,
+                name: `Status`,
+                type: 'button',
+                style: {
+                    text: `${statusIcon}\\n${showName}\\nSTATUS`,
+                    size: '14',
+                    color: combineRgb(200, 200, 200),
+                    bgcolor: combineRgb(40, 40, 40)
+                },
+                steps: [{
+                    down: []  // No action - display only
+                }],
+                feedbacks: [
+                    {
+                        feedbackId: 'showRunning',
+                        options: { showId: showId },
+                        style: {
+                            text: `🟢\\n${showName}\\nRUNNING`,
+                            color: combineRgb(255, 255, 255),
+                            bgcolor: combineRgb(0, 100, 0)
+                        }
+                    },
+                    {
+                        feedbackId: 'showStopped',
+                        options: { showId: showId },
+                        style: {
+                            text: `⚪\\n${showName}\\nSTOPPED`,
+                            color: combineRgb(150, 150, 150),
+                            bgcolor: combineRgb(60, 60, 60)
+                        }
+                    }
+                ]
+            })
+        }
+        
+        inst.log('debug', `Generated Launch Control presets for ${showIdsWithRundowns.size} shows`)
+    }
+
     // append rundown presets (only for rundowns loaded on running shows)
     // Combines both playback controls AND Nodos item buttons in the same per-item category
     if (inst.data.rundowns && Object.keys(inst.data.rundowns).length > 0) {

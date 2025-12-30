@@ -312,6 +312,8 @@ export const loadEngines = async (inst) => {
         
         // Check show status feedbacks to update already-placed buttons
         inst.checkFeedbacks('showStatusInactive')
+        inst.checkFeedbacks('showRunning')
+        inst.checkFeedbacks('showStopped')
         
         inst.log('info', `Updated: ${Object.keys(engines).length} Reality Engines, ${Object.keys(shows).length} Shows`)
     } else {
