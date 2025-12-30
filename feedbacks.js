@@ -513,12 +513,21 @@ function createFeedbacks(inst) {
             description: 'Shows the name of selected button',
             options: rundownButtonOptions(inst.data.rundowns),
             callback: (event) => {
-                const parts = event.options[event.options[event.options.rundown]].split('_')
+                // Safety check: ensure all required options exist
+                const rundownKey = event.options.rundown
+                if (!rundownKey) return { text: '' }
+                
+                const itemSelection = event.options[rundownKey]
+                if (!itemSelection || typeof itemSelection !== 'string') return { text: '' }
+                
+                const parts = itemSelection.split('_')
+                if (parts.length < 3) return { text: '' }
+                
                 const rID = parts[0]
                 const iID = parts[1]
                 const bID = parts.slice(2).join('_')
                 let label = ''
-                try { label = inst.data.rundowns[rID.substring(1)].items[iID.substring(1)].buttons[bID.substring(1)]}
+                try { label = inst.data.rundowns[rID.substring(1)]?.items?.[iID.substring(1)]?.buttons?.[bID.substring(1)] || ''}
                 catch(error) {}
                 return { text: label }
             }
@@ -533,12 +542,21 @@ function createFeedbacks(inst) {
             description: 'Shows the name of selected button',
             options: templateButtonOptions(inst.data.templates),
             callback: (event) => {
-                const parts = event.options[event.options.template].split('_')
+                // Safety check: ensure all required options exist
+                const templateKey = event.options.template
+                if (!templateKey) return { text: '' }
+                
+                const itemSelection = event.options[templateKey]
+                if (!itemSelection || typeof itemSelection !== 'string') return { text: '' }
+                
+                const parts = itemSelection.split('_')
+                if (parts.length < 3) return { text: '' }
+                
                 const rID = parts[0]
                 const iID = parts[1]
                 const bID = parts.slice(2).join('_')
                 let label = ''
-                try { label = inst.data.templates[rID.substring(1)].items[iID.substring(1)].buttons[bID.substring(1)]}
+                try { label = inst.data.templates[rID.substring(1)]?.items?.[iID.substring(1)]?.buttons?.[bID.substring(1)] || ''}
                 catch(error) {}
                 return { text: label }
             }

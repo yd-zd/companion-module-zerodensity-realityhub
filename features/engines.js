@@ -7,8 +7,9 @@
 // 
 // We fetch BOTH /launcher (rich data) and /lino/engines (loadedRundownsInfo) and merge them
 
+import { getActions } from '../actions.js'
 import { getVariables } from '../variables.js'
-import { ms2S, isEqual } from '../tools.js'
+import { ms2S, isEqual, contains, shouldUpdate } from '../tools.js'
 
 
 // Creating multidropdown with all available Reality Engines
@@ -257,7 +258,36 @@ export const loadEngines = async (inst) => {
 
     // Update data if changed
     const enginesChanged = !isEqual(inst.data.engines, engines)
-    const showsChanged = !isEqual(inst.data.shows, shows)
+    
+    // Custom check for Shows: Only care about running/started and loadedRundowns
+    // This prevents false positives from deep object comparison of complex renderer data
+    let showsChanged = false
+    const oldShows = inst.data.shows || {}
+    const showIds = new Set([...Object.keys(oldShows), ...Object.keys(shows)])
+    
+    for (const id of showIds) {
+        const oldShow = oldShows[id]
+        const newShow = shows[id]
+        
+        if (!oldShow || !newShow) {
+            showsChanged = true // Show added or removed
+            break
+        }
+        
+        if (oldShow.running !== newShow.running || oldShow.started !== newShow.started) {
+            showsChanged = true // Status changed
+            break
+        }
+        
+        // Check loaded rundowns (IDs only)
+        const oldRundowns = (oldShow.loadedRundowns || []).map(r => r.id).sort().join(',')
+        const newRundowns = (newShow.loadedRundowns || []).map(r => r.id).sort().join(',')
+        
+        if (oldRundowns !== newRundowns) {
+            showsChanged = true // Rundowns changed
+            break
+        }
+    }
 
     if (enginesChanged || showsChanged) {
         // Save new data
@@ -273,6 +303,9 @@ export const loadEngines = async (inst) => {
         // Set variable values
         inst.updateVariables(val)
         
+        // Update Action Definitions (dropdowns) immediately when show structure changes
+        inst.setActionDefinitions(getActions(inst))
+        
         inst.log('info', `Updated: ${Object.keys(engines).length} Reality Engines, ${Object.keys(shows).length} Shows`)
     } else {
         // Only update duration variable
@@ -284,4 +317,26 @@ export const loadEngines = async (inst) => {
 
     // Update data loading feedback
     inst.checkFeedbacks('basicFeatureDataLoading')
+
+    // ========== TRIGGER DEPENDENT UPDATES ==========
+    // Now that we have fresh Engines and Shows data, trigger other updates
+    
+    // RUNDOWNS
+    if (shouldUpdate(inst, 'rundowns', 'lastRundownUpdate', showsChanged)) {
+        if (showsChanged) inst.log('info', 'Show configuration changed - Triggering immediate rundown update')
+        inst.pollRundowns(inst)
+        inst.data.module.lastRundownUpdate = Date.now()
+    }
+
+    // NODES
+    if (shouldUpdate(inst, 'nodes', 'lastNodesUpdate')) {
+        inst.pollNodes(inst)
+        inst.data.module.lastNodesUpdate = Date.now()
+    }
+
+    // TEMPLATES
+    if (shouldUpdate(inst, 'templates', 'lastTemplatesUpdate')) {
+        inst.pollTemplates(inst)
+        inst.data.module.lastTemplatesUpdate = Date.now()
+    }
 }

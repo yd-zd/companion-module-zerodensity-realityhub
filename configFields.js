@@ -50,6 +50,7 @@ export const createConfigFields = [
         label: 'API Key:',
         width: 6,
         default: '',
+        regex: /^rh_/,
         tooltip: 'Enter your RealityHub API key (required for authentication)'
     },
     {
@@ -65,12 +66,24 @@ export const createConfigFields = [
         tooltip: 'Select available features. More features, especially the "Nodes" feature, can be resource intensive but will add more functionality'
     },
     {
+        type: 'number',
+        id: 'interval',
+        label: 'Global Poll Interval (seconds):',
+        width: 12,
+        default: 10,
+        min: 1,
+        max: 600,
+        required: true,
+        tooltip: 'Sets the master interval (in seconds) for querying RealityHub. Lower values increase CPU usage.',
+        isVisible: (options) => Array.isArray(options.features) && options.features.length > 0
+    },
+    {
         type: 'textinput',
         id: 'showFilter',
-        label: 'Show Filter (Optional):',
+        label: 'Rundown Filter (Optional):',
         width: 12,
         default: '',
-        tooltip: 'Enter comma-separated Show IDs or Names to specifically select shows. If set, only rundowns from these shows will be loaded (even if the show is not running). Leave empty to load all running shows.',
+        tooltip: 'Enter comma-separated Rundown names to filter which rundowns are loaded. Only rundowns matching these names will appear in presets. Leave empty to load all rundowns from running shows.',
         isVisible: (options) => Array.isArray(options.features) && options.features.includes('rundowns')
     },
     {
@@ -161,26 +174,6 @@ export const createConfigFields = [
         default: false,
         tooltip: 'If enabled, the module will update all templates automanically. This can impact performance!',
         isVisible: (options) => Array.isArray(options.features) && options.features.length > 2 && options.features[2] === 'templates'
-    },
-    {
-        type: 'dropdown',
-        id: 'interval',
-        label: 'Auto-Update Interval:',
-        width: 12,
-        default: 'short',
-        tooltip: 'Sets the interval for updating features automatically. Shorter intervals can impact performance!',
-        choices: [
-            { id: 1, label: 'Short Interval (as often as possible)' },
-            { id: 10, label: 'Medium Interval' },
-            { id: 60, label: 'Long Interval (every couple of minutes)' },
-        ],
-        isVisible: (options) => {
-            let buttons = false
-            if (options.nodes0 || options.nodes1 || options.nodes2 || options.rundowns0 || options.rundowns1 || options.rundowns2 || options.templates0 || options.templates1 || options.templates2) {
-                buttons = true
-            }
-            return Array.isArray(options.features) && options.features.length > 0 && buttons
-        }
     },
     {
         type: 'textinput',

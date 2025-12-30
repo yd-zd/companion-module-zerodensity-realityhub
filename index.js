@@ -87,22 +87,19 @@ class RealityHubInstance extends InstanceBase {
 				updateNodesData: false,
 				updateNodesDuration: 0,
 				updateNodesProgress: 0,
+				
+				// Cache Timestamps
+				lastRundownUpdate: 0,
+				lastNodesUpdate: 0,
+				lastTemplatesUpdate: 0,
+				
 				inputNodeMappings: {},
 				feedbackRequestActive: {},
 			},
 			timer: {
 				updateEngines: new defaultTimer(() => {
 					if (this.data.module.updateEnginesData === false) this.pollEngines(this)
-				}, this),
-				updateNodes: new defaultTimer(() => {
-					if (this.data.module.updateNodesData === false) this.pollNodes(this)
-				}, this),
-				updateRundowns: new defaultTimer(() => {
-					if (this.data.module.updateRundownsData === false) this.pollRundowns(this)
-				}, this),
-				updateTemplates: new defaultTimer(() => {
-					if (this.data.module.updateTemplatesData === false) this.pollTemplates(this)
-				}, this),
+				}, this)
 			}
 		}
 
@@ -119,9 +116,6 @@ class RealityHubInstance extends InstanceBase {
 		this.moduleInitiated = false
 
 		this.data.timer.updateEngines.stop()
-		this.data.timer.updateNodes.stop()
-		this.data.timer.updateRundowns.stop()
-		this.data.timer.updateTemplates.stop()
 		this.executors.variables.stop()
 		this.executors.requests.block()
 		await SLEEP(1000)
@@ -255,33 +249,12 @@ class RealityHubInstance extends InstanceBase {
 	}
 
 	async autoUpdater() {
-		// start engines timer
-		this.data.timer.updateEngines.start(5000)
-
-		// Safe access to features array
-		const features = this.config?.features || []
+		// start engines timer (Master Timer)
+		// This will trigger other updates (rundowns, nodes, etc.) sequentially
 		const interval = (this.config?.interval || 10) * 1000
-
-		// check if "Auto-Update Nodes" is true
-		const nodesIndex = features.findIndex((element) => element === 'nodes')
-		if (nodesIndex >= 0 && this.config['nodes' + nodesIndex] === true) {
-			this.data.timer.updateNodes.start(interval)
-			this.log('debug', `Auto updater for "nodes" data with delay of ${interval}ms started!`)
-		}
-
-		// check if "Auto-Update Rundowns" is true
-		const rundownsIndex = features.findIndex((element) => element === 'rundowns')
-		if (rundownsIndex >= 0 && this.config['rundowns' + rundownsIndex] === true) {
-			this.data.timer.updateRundowns.start(interval)
-			this.log('debug', `Auto updater for "rundowns" data with delay of ${interval}ms started!`)
-		}
-
-		// check if "Auto-Update Templates" is true
-		const templatesIndex = features.findIndex((element) => element === 'templates')
-		if (templatesIndex >= 0 && this.config['templates' + templatesIndex] === true) {
-			this.data.timer.updateTemplates.start(interval)
-			this.log('debug', `Auto updater for "templates" data with delay of ${interval}ms started!`)
-		}
+		this.data.timer.updateEngines.start(interval)
+		
+		this.log('debug', `Auto updater started with interval of ${interval}ms`)
 	}
 
 	// handle errors (non-blocking)
@@ -329,6 +302,19 @@ class RealityHubInstance extends InstanceBase {
 		if (!host || host.split('.').length !== 4) {
 			this.updateStatus('bad_config', 'Enter IP address')
 			this.log('debug', 'Waiting for valid RealityHub IP address')
+			return
+		}
+
+		// Check for valid API key (must be provided and start with "rh_")
+		const apiKey = config.apiKey || ''
+		if (!apiKey || apiKey.trim() === '') {
+			this.updateStatus('bad_config', 'Enter API key')
+			this.log('debug', 'Waiting for valid RealityHub API key')
+			return
+		}
+		if (!/^rh_/.test(apiKey.trim())) {
+			this.updateStatus('bad_config', 'Invalid API key')
+			this.log('debug', 'Invalid API key format')
 			return
 		}
 
@@ -403,20 +389,33 @@ class RealityHubInstance extends InstanceBase {
 		let response = null
 
 		try {
-			// handle "GET" requests
-			if (method === 'GET') response = await got.get(url, parameters).json()
-
-			// handle "POST" requests
-			else if (method === 'POST') response = await got.post(url, parameters).json()
-
-			// handle "PATCH" requests
-			else if (method === 'PATCH') response = await got.patch(url, parameters).json()
-
-			// handle "PUT" requests
-			else if (method === 'PUT') response = await got.put(url, parameters).json()
-
-			// handle "DELETE" requests
-			else if (method === 'DELETE') response = await got.delete(url, parameters).json()
+			// Handle requests based on method
+            // Note: PUT requests often return 204 No Content or empty bodies, so we handle text response if JSON fails
+			if (method === 'GET') {
+                response = await got.get(url, parameters).json()
+            }
+			else if (method === 'POST') {
+                response = await got.post(url, parameters).json()
+            }
+			else if (method === 'PATCH') {
+                response = await got.patch(url, parameters).json()
+            }
+			else if (method === 'PUT') {
+                // For PUT, we accept text response if JSON parsing fails (common for 204 No Content)
+                try {
+                    response = await got.put(url, parameters).json()
+                } catch (jsonError) {
+                    if (jsonError.name === 'ParseError') {
+                        // If JSON parse fails, it might be an empty body (success)
+                        response = {} 
+                    } else {
+                        throw jsonError
+                    }
+                }
+            }
+			else if (method === 'DELETE') {
+                response = await got.delete(url, parameters).json()
+            }
 
 			this.requestErrors = 0
 		}

@@ -2,6 +2,32 @@
 
 
 
+// Helper to check if a feature needs updating based on time interval or state change
+export const shouldUpdate = (inst, featureName, lastUpdateKey, forceUpdate = false) => {
+    // 1. Check if feature is enabled in config
+    if (!contains(inst.config.features, featureName)) return false
+
+    // 2. Check if auto-update is enabled for this feature
+    const featureIndex = inst.config.features.findIndex((element) => element === featureName)
+    const autoUpdateEnabled = featureIndex >= 0 && inst.config[featureName + featureIndex] === true
+
+    // 3. Calculate time since last update
+    const now = Date.now()
+    const interval = (inst.config.interval || 10) * 1000
+    const lastUpdate = inst.data.module[lastUpdateKey] || 0
+    const timeSinceLastUpdate = now - lastUpdate
+
+    // 4. Determine update status
+    // If forced (e.g. show change), update immediately
+    if (forceUpdate) return true
+
+    // If auto-update is ON, update if interval passed OR if never updated
+    if (autoUpdateEnabled && (timeSinceLastUpdate >= interval || !lastUpdate)) return true
+
+    // Otherwise, do not update
+    return false
+}
+
 export const featureLogic = (options, data) => {
     if (options.data !== data.id) return false
     if (data.config.features.findIndex((element) => element === data.feature) !== -1) return false

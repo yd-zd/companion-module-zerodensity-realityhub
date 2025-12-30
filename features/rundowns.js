@@ -241,8 +241,8 @@ export const loadRundowns = async (inst) => {
     inst.data.module.updateRundownsProgress = 0
     inst.updateVariables({ updateRundownsProgress: inst.data.module.updateRundownsProgress + '%' })
 
-    // Create empty rundowns object
-    let rundowns = {}
+    // MERGE STRATEGY: Initialize with existing rundowns to preserve state during show restarts
+    let rundowns = { ...inst.data.rundowns }
 
     let totalSteps = 0
     let currentStep = 0
@@ -258,7 +258,7 @@ export const loadRundowns = async (inst) => {
     }
 
     // Get ALL shows that have loaded rundowns (regardless of running status)
-    // Apply show filter if configured
+    // Apply Rundown Name filter if configured
     const showFilterStr = inst.config.showFilter || ''
     const showFilter = showFilterStr.split(',').map(s => s.trim()).filter(s => s !== '')
     const hasFilter = showFilter.length > 0
@@ -267,25 +267,21 @@ export const loadRundowns = async (inst) => {
         // Must have loaded rundowns
         if (!show.loadedRundowns || show.loadedRundowns.length === 0) return false
         
-        if (hasFilter) {
-            // Strict filtering: only include shows matching the filter (ID or Name)
-            return showFilter.includes(String(id)) || showFilter.includes(show.name)
-        }
-        // Default: include ALL shows with loaded rundowns
+        // We filter rundowns later by name, so we include all shows that have rundowns here
         return true
     })
     
     if (targetShows.length === 0) {
-        const msg = hasFilter 
-            ? 'Skipping rundown update: No shows match the configured filter' 
-            : 'Skipping rundown update: No shows have loaded rundowns'
-        inst.log('warn', msg)
+        // Only warn if we really have no shows with rundowns
+        if (!hasFilter) {
+            inst.log('warn', 'Skipping rundown update: No shows have loaded rundowns')
+        }
         inst.data.module.updateRundownsData = false
         return
     }
     
     const targetShowIds = targetShows.map(([id]) => id)
-    inst.log('info', `Querying rundowns for ${targetShows.length} show(s) with loaded rundowns: ${targetShowIds.join(', ')}`)
+    // inst.log('info', `Querying rundowns for ${targetShows.length} show(s) with loaded rundowns: ${targetShowIds.join(', ')}`)
 
     // Build a map of rundown ID -> show ID from loadedRundownsInfo
     // Note: loadedRundownsInfo only contains { id }, not { id, name }
@@ -297,7 +293,7 @@ export const loadRundowns = async (inst) => {
             rundownToShow[rd.id] = { showId, showName: show.name }
         }
     }
-    inst.log('info', `Found ${loadedRundownIds.size} rundowns from loadedRundownsInfo: ${[...loadedRundownIds].join(', ')}`)
+    // inst.log('info', `Found ${loadedRundownIds.size} rundowns from loadedRundownsInfo: ${[...loadedRundownIds].join(', ')}`)
 
     // Query rundowns API to get full rundown details (including names)
     // Use /lino/rundowns (without showId) to get ALL rundowns across all shows
@@ -310,33 +306,50 @@ export const loadRundowns = async (inst) => {
     }
     
     // Filter to only rundowns that are loaded on our target shows
-    const loadedRundowns = rundownsData.filter(rd => loadedRundownIds.has(rd.id))
-    inst.log('info', `Filtered to ${loadedRundowns.length} loaded rundowns out of ${rundownsData.length} total from API`)
+    // AND apply the Rundown Name filter if configured
+    const loadedRundowns = rundownsData.filter(rd => {
+        // Must be loaded on a show
+        if (!loadedRundownIds.has(rd.id)) return false
+        
+        // Apply Name filter if configured
+        if (hasFilter) {
+            return showFilter.some(name => rd.name === name || rd.name.includes(name))
+        }
+        
+        return true
+    })
+    
+    // inst.log('info', `Filtered to ${loadedRundowns.length} loaded rundowns out of ${rundownsData.length} total from API`)
     
     totalSteps = loadedRundowns.length + 1
 
-    for (const rundown of loadedRundowns) {
+    // PARALLEL FETCHING: Fetch all items in parallel using Promise.all
+    const itemPromises = loadedRundowns.map(async (rundown) => {
         const rundownKey = rundown.id
         const showInfo = rundownToShow[rundown.id] || { showId: targetShowIds[0], showName: 'Unknown' }
         const showId = showInfo.showId
         
-        // Create rundown entry using name from API response
-        rundowns[rundownKey] = {
+        // Initialize rundown entry using name from API response
+        // We preserve existing items if update fails
+        const existingItems = rundowns[rundownKey]?.items || {}
+        
+        const newRundownEntry = {
             name: rundown.name,  // Get name from API, not from loadedRundownsInfo
             showId: showId,
             showName: showInfo.showName,
             linoEngineId: showId,
-            items: {}
+            items: existingItems // Start with existing items
         }
 
         // Request items for this rundown using correct Show ID
         const itemsData = await inst.GET(`lino/rundown/${showId}/${rundown.id}/items/`, {}, 'medium')
 
         if (itemsData !== null && Array.isArray(itemsData)) {
+            const newItems = {}
             for (const item of itemsData) {
                 const itemId = item.id
                 
-                rundowns[rundownKey].items[itemId] = {
+                newItems[itemId] = {
                     name: item.name,
                     template: item.template || null,
                     buttons: {}
@@ -345,21 +358,30 @@ export const loadRundowns = async (inst) => {
                 // Update button labels
                 if (item.buttons) {
                     for (const [key, label] of Object.entries(item.buttons)) {
-                        rundowns[rundownKey].items[itemId].buttons[key] = label || key
+                        newItems[itemId].buttons[key] = label || key
                     }
                 }
             }
-            
-            inst.log('info', `Loaded ${Object.keys(rundowns[rundownKey].items).length} items for rundown "${rundown.name}" (Show: ${showInfo.showName})`)
+            newRundownEntry.items = newItems // Replace items with fresh data
+            // inst.log('info', `Loaded ${Object.keys(newItems).length} items for rundown "${rundown.name}" (Show: ${showInfo.showName})`)
         } else {
-            inst.log('warn', `No items found for rundown "${rundown.name}" (ID: ${rundown.id}) on Show ${showId}`)
+            // Log as debug, not warning (common for empty rundowns or during load)
+            // inst.log('debug', `No items found for rundown "${rundown.name}" (ID: ${rundown.id}) on Show ${showId}`)
         }
-
-        // Update progress
-        currentStep++
-        inst.data.module.updateRundownsProgress = Math.floor(100 * currentStep / totalSteps)
-        inst.updateVariables({ updateRundownsProgress: inst.data.module.updateRundownsProgress + '%' })
-        if (!inst.moduleInitiated) inst.updateStatus('LOAD: Rundowns data ...', inst.data.module.updateRundownsProgress + '%')
+        
+        // Update progress (atomic increment not needed as we just calculate % at end or periodically)
+        // But since this is parallel, we can't easily update progress bar per item sequentially in a meaningful way 
+        // without a counter.
+        
+        return { key: rundownKey, data: newRundownEntry }
+    })
+    
+    // Wait for all item requests to complete
+    const results = await Promise.all(itemPromises)
+    
+    // Update rundowns object with results
+    for (const result of results) {
+        rundowns[result.key] = result.data
     }
 
     if (inst.enableRequests === false) {

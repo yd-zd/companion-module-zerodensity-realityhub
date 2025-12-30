@@ -37,11 +37,11 @@ This module allows you to control Zero Density RealityHub 2.1 with comprehensive
 * **Rundowns** - Enable rundown control with playback actions
 * **Templates** - Enable template control with a dedicated template pool
 
-**Show Filter (Optional):**
-When the Rundowns feature is enabled, you can filter rundowns by specific shows:
-* Enter comma-separated Show IDs or Names (e.g., "Companion, VS, 92")
-* If set, only rundowns from these shows will be loaded
-* Leave empty to load rundowns from all shows with loaded rundowns
+**Rundown Filter (Optional):**
+When the Rundowns feature is enabled, you can filter which rundowns appear in presets:
+* Enter comma-separated Rundown names (e.g., "Main Show, Breaking News, Weather")
+* Only rundowns matching these names will be loaded into presets
+* Leave empty to load all rundowns from running shows
 
 **Auto-Update Options:**
 * Enable automatic updates for Nodes, Rundowns, or Templates data
@@ -152,9 +152,9 @@ All item buttons display the item name on the first line for easy identification
 * Try using HTTPS if HTTP connections are blocked
 
 **Rundowns Not Appearing:**
-* Check that the Show has rundowns loaded (see loadedRundownsInfo)
-* Try using the Show Filter to explicitly include the show by name or ID
-* Verify the Show is running or has `started: true` status
+* Check that the Show has rundowns loaded in RealityHub
+* Use the Rundown Filter to filter by specific rundown names if needed
+* Verify the Show is running - only running shows' rundowns are loaded by default
 
 **Playback Commands Not Working:**
 * RealityHub uses Show IDs (not Reality Engine IDs) for Lino API calls
