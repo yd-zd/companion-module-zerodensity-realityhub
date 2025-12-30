@@ -256,78 +256,12 @@ export const getPresets = (inst) => {
     }
 
     // append rundown presets (only for rundowns loaded on running shows)
+    // Combines both playback controls AND Nodos item buttons in the same per-item category
     if (inst.data.rundowns && Object.keys(inst.data.rundowns).length > 0) {
-        let rundownPresetsCount = 0
+        let totalPresetsCount = 0
         const shows = inst.data.shows || {}
         
         // loop over all rundowns
-        for (const [rID, rundown] of Object.entries(inst.data.rundowns)) {
-            // Get show info for category naming
-            const showId = rundown.showId || rundown.linoEngineId
-            const show = showId ? shows[showId] : null
-            const showName = rundown.showName || (show ? show.name : 'Unknown')
-            const isShowActive = show?.running || show?.started
-            const showPrefix = isShowActive ? `🟢 ${showName}` : `⚪ ${showName}`
-            
-            // loop over all items in rundown
-            if (rundown.items) {
-                for (const [iID, itemData] of Object.entries(rundown.items)) {
-                    // loop over all buttons in item
-                    if (itemData.buttons && Object.keys(itemData.buttons).length > 0) {
-                        for (const [buttonKey, buttonLabel] of Object.entries(itemData.buttons)) {
-                            // if button is valid add preset
-                            if (buttonLabel !== undefined) {
-                                presets.push({
-                                    category: `${showPrefix} > ${rundown.name}`,
-                                    name: `${itemData.name} - ${buttonLabel}`,
-                                    type: 'button',
-                                    style: {
-                                        text: buttonLabel,
-                                        size: '18',
-                                        color: combineRgb(255, 255, 255),
-                                        bgcolor: combineRgb(0, 102, 0)
-                                    },
-                                    steps: [
-                                        {
-                                            down: [
-                                                {
-                                                    actionId: 'rundownButtonPress',
-                                                    options: {
-                                                        rundown: `r${rID}`,
-                                                        [`r${rID}`]: `r${rID}_i${iID}`,
-                                                        [`r${rID}_i${iID}`]: `r${rID}_i${iID}_b${buttonKey}`
-                                                    }
-                                                }
-                                            ]
-                                        }
-                                    ],
-                                    feedbacks: [
-                                        {
-                                            feedbackId: 'rundownButtonLabel',
-                                            options: {
-                                                rundown: `r${rID}`,
-                                                [`r${rID}`]: `r${rID}_i${iID}`,
-                                                [`r${rID}_i${iID}`]: `r${rID}_i${iID}_b${buttonKey}`
-                                            },
-                                            style: {
-                                                color: combineRgb(255, 255, 255),
-                                                bgcolor: combineRgb(0, 51, 0)
-                                            }
-                                        }
-                                    ]
-                                })
-                                rundownPresetsCount++
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        inst.log('debug', `Generated ${rundownPresetsCount} rundown presets from ${Object.keys(inst.data.rundowns).length} rundowns`)
-        
-        // Add rundown item PLAYBACK control presets (Play/Out/Continue for each item)
-        // Organized by show > rundown > item
-        let controlPresetsCount = 0
         for (const [rID, rundown] of Object.entries(inst.data.rundowns)) {
             // Get show info for category naming
             const showId = rundown.showId || rundown.linoEngineId
@@ -428,17 +362,24 @@ export const getPresets = (inst) => {
                 }],
                 feedbacks: []
             })
-            controlPresetsCount += 4
+            totalPresetsCount += 4
             
             // Add presets for each item - each item gets its own category
+            // Combines BOTH playback controls AND Nodos form buttons
             if (rundown.items) {
                 for (const [iID, itemData] of Object.entries(rundown.items)) {
                     const itemLabel = itemData.name || `Item #${iID}`
-                    // Create category per item: "ShowName > RundownName: ItemName"
-                    const itemCategory = `${showPrefix} > ${rundown.name}: ${itemLabel}`
+                    // Check if item has Nodos buttons (form controls)
+                    const hasNodosButtons = itemData.buttons && Object.keys(itemData.buttons).length > 0
+                    // Add 🎛️ icon for items with Nodos buttons to distinguish them
+                    const itemIcon = hasNodosButtons ? '🎛️ ' : ''
+                    // Create category per item: "ShowName > RundownName: [icon]ItemName"
+                    const itemCategory = `${showPrefix} > ${rundown.name}: ${itemIcon}${itemLabel}`
                     
                     // Shorten item name for button display (max ~10 chars)
                     const shortName = itemLabel.length > 10 ? itemLabel.substring(0, 9) + '…' : itemLabel
+                    
+                    // === PLAYBACK CONTROLS (standard for all items) ===
                     
                     // Play to Preview (green - like in RealityHub UI)
                     presets.push({
@@ -560,11 +501,60 @@ export const getPresets = (inst) => {
                         feedbacks: []
                     })
                     
-                    controlPresetsCount += 5
+                    totalPresetsCount += 5
+                    
+                    // === NODOS FORM BUTTONS (if item has buttons) ===
+                    if (itemData.buttons && Object.keys(itemData.buttons).length > 0) {
+                        for (const [buttonKey, buttonLabel] of Object.entries(itemData.buttons)) {
+                            // if button is valid add preset
+                            if (buttonLabel !== undefined) {
+                                presets.push({
+                                    category: itemCategory,  // Same category as playback controls
+                                    name: `${buttonLabel}`,
+                                    type: 'button',
+                                    style: {
+                                        text: buttonLabel,
+                                        size: '18',
+                                        color: combineRgb(255, 255, 255),
+                                        bgcolor: combineRgb(0, 102, 0)
+                                    },
+                                    steps: [
+                                        {
+                                            down: [
+                                                {
+                                                    actionId: 'rundownButtonPress',
+                                                    options: {
+                                                        rundown: `r${rID}`,
+                                                        [`r${rID}`]: `r${rID}_i${iID}`,
+                                                        [`r${rID}_i${iID}`]: `r${rID}_i${iID}_b${buttonKey}`
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    ],
+                                    feedbacks: [
+                                        {
+                                            feedbackId: 'rundownButtonLabel',
+                                            options: {
+                                                rundown: `r${rID}`,
+                                                [`r${rID}`]: `r${rID}_i${iID}`,
+                                                [`r${rID}_i${iID}`]: `r${rID}_i${iID}_b${buttonKey}`
+                                            },
+                                            style: {
+                                                color: combineRgb(255, 255, 255),
+                                                bgcolor: combineRgb(0, 51, 0)
+                                            }
+                                        }
+                                    ]
+                                })
+                                totalPresetsCount++
+                            }
+                        }
+                    }
                 }
             }
-            inst.log('info', `Created ${controlPresetsCount} Lino playback presets for rundown "${rundown.name}"`)
         }
+        inst.log('debug', `Generated ${totalPresetsCount} rundown presets from ${Object.keys(inst.data.rundowns).length} rundowns`)
     } else {
         inst.log('debug', 'No rundown data available for presets')
     }
