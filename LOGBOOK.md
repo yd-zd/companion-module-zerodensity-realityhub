@@ -1,5 +1,154 @@
 # RealityHub Companion Module - Development Logbook
 
+## 2025-01-XX: Version 2.1.4 - HTTPS/SSL Support and Port Configuration
+
+### Major Features Added
+
+#### 1. HTTPS/SSL Protocol Support
+- Added protocol dropdown selector (HTTP/HTTPS) in configuration
+- Default protocol: HTTP (for backward compatibility)
+- Smart URL construction that omits default ports (80 for HTTP, 443 for HTTPS)
+- Enables support for RealityHub servers with SSL/TLS enabled
+
+#### 2. Customizable Port Configuration
+- Added port number input field (1-65535) with proper validation
+- Default port: 80
+- Type: `number` input with min/max constraints to prevent invalid values
+- Runtime validation ensures integer values only (handles decimals like 80.5 → 80)
+- Port is automatically clamped to valid range (1-65535)
+
+#### 3. Non-Blocking Error Handling
+**Problem:** Connection failures were blocking the Companion server and preventing config panel editing.
+
+**Solution:**
+- Module now uses non-blocking status values (`disconnected`, `bad_config`, `connection_failure`)
+- Connection errors display descriptive messages in the config panel
+- Users can always access and edit configuration even when connection fails
+- All connection attempts wrapped in try-catch to prevent crashes
+- Async operations use `.catch()` handlers for graceful error handling
+
+**Status Messages:**
+- `"Cannot reach https://172.16.0.118:80/api/rest/v1"` - Connection failure
+- `"Enter IP address"` - Missing required config
+- `"API Key issue: Unauthorized"` - Authentication error
+- `"Connection timeout"` - Network timeout
+
+### Technical Implementation
+
+#### URL Construction
+- New `getBaseUrl()` helper method builds URLs with protocol and port
+- Automatically omits port from URL if using defaults (80/443)
+- Handles both string and number port values from config
+
+#### Configuration Validation
+- Port validation: `Math.floor()` converts decimals to integers
+- Port clamping: `Math.max(1, Math.min(65535, port))` ensures valid range
+- Protocol fallback: Defaults to 'http' if not specified
+
+#### Upgrade Script
+- Added migration script for existing configurations
+- Automatically sets `protocol: 'http'` and `port: 80` for old configs
+- Converts string ports to integers during upgrade
+
+### Files Changed
+- **`configFields.js`** - Added protocol dropdown and port number input
+- **`index.js`** - Added `getBaseUrl()` helper, port validation, non-blocking error handling
+- **`upgrades.js`** - Added migration script for protocol/port fields
+
+### Backward Compatibility
+- Existing configurations automatically upgraded with defaults
+- Old string port values converted to integers
+- HTTP protocol and port 80 remain defaults for compatibility
+
+---
+
+## 2025-12-30: Version 2.1.3 - Show Grouping, All Out Support, and Preset UI Improvements
+
+### Major Features Added
+
+#### 1. Show-Based Rundown Filtering
+- Added `showFilter` config option to filter rundowns by specific shows
+- Users can enter comma-separated Show IDs or Names (e.g., "Companion, VS")
+- Allows loading rundowns from stopped shows if explicitly filtered
+- Improves organization when working with multiple shows
+
+#### 2. All Out Functionality
+Added "Program All Out" and "Preview All Out" actions matching RealityHub UI:
+- **New Action**: `rundownAllOut` - Loops through all items in a rundown and calls `out` for each
+- **New Presets**: Orange-yellow buttons in Controls category:
+  - `■ ALL PROGRAM` - Stops all items from Program channel
+  - `■ ALL PREVIEW` - Stops all items from Preview channel
+- Color scheme matches RealityHub's orange-yellow "All Out" buttons
+- Logs success/failure count for debugging
+
+**Implementation Note:** Since RealityHub API has no dedicated "All Out" endpoint, the action iterates through all items and calls individual `out` commands. This is safe but may be slower for large rundowns.
+
+#### 3. Enhanced Preset Organization
+- **Show Name Prefixes**: All preset categories now include show name with status indicator
+  - Format: `🟢 ShowName > RundownName: ItemName` (green = running)
+  - Format: `⚪ ShowName > RundownName: ItemName` (gray = stopped)
+- **Better Grouping**: Presets are now grouped by show, making it easier to find rundowns
+- **Category Structure**:
+  - `🟢 ShowName > RundownName: 🎬 Controls` - Global rundown controls
+  - `🟢 ShowName > RundownName: ItemName` - Item-specific buttons
+
+#### 4. Item Names on Buttons
+- Added item names to playback control buttons for better identification
+- Two-line button text format:
+  - Line 1: Item name (truncated to ~10 chars with "…")
+  - Line 2: Action icon + channel (e.g., "▶ PVW", "■ PGM")
+- Reduced font size to 14 to fit both lines
+- Makes it easy to identify which item each button controls
+
+### Critical Fixes
+
+#### 5. Rundown Loading API Fix
+**Problem:** Using `/lino/rundowns/{showId}` was failing because the API returns ALL rundowns regardless of the showId parameter, and some shows might not be running.
+
+**Solution:**
+- Changed to use `/lino/rundowns` (no showId) which returns all rundowns
+- Filter results using `loadedRundownsInfo` from shows
+- Include ALL shows with `loadedRundowns`, not just running ones
+- This ensures all loaded rundowns are available, even from stopped shows
+
+#### 6. Enhanced Show Detection
+- Updated `rundownToShowMap` to include ALL shows with `loadedRundowns` (not just running)
+- Added detailed logging for all shows with their status and loaded rundowns
+- Log format: `Show ID "Name" 🟢 RUNNING - X rundowns: [id:name, ...]`
+- Helps debug which shows have which rundowns loaded
+
+#### 7. Improved Error Handling
+- Better error messages when rundown API calls fail
+- Logs show which rundowns were found vs. which were filtered
+- More informative warnings when no shows match filter criteria
+
+### Files Changed
+
+- **`configFields.js`** - Added `showFilter` config field (visible when Rundowns feature enabled)
+- **`features/engines.js`** - Enhanced logging, include all shows with loadedRundowns in mapping
+- **`features/rundowns.js`** - Fixed API endpoint, improved filtering logic, better error handling
+- **`actions.js`** - Added `rundownAllOut` action for stopping all items
+- **`presets.js`** - Added show name prefixes, All Out presets, item names on buttons
+
+### UI Improvements Summary
+
+**Before:**
+- Categories: `Rundown: rd-test`
+- Buttons: `▶ PVW` (no item name)
+- No All Out buttons
+
+**After:**
+- Categories: `🟢 Companion > rd-test: 🎬 Controls`
+- Buttons: `News_FS_B…\n▶ PVW` (with item name)
+- All Out buttons: `■ ALL PROGRAM` / `■ ALL PREVIEW`
+
+### Related Improvements
+- Better alignment with RealityHub UI conventions
+- Improved discoverability of rundowns across multiple shows
+- Enhanced debugging capabilities with detailed logging
+
+---
+
 ## 2025-12-29: Version 2.1.2 - Lino Rundown Controls and Show Status Fixes
 
 ### Major Features Added
