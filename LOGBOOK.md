@@ -1,5 +1,68 @@
 # RealityHub Companion Module - Development Logbook
 
+## 2025-12-30: Version 2.1.6 - Dynamic Button Dimming via Show Status Feedback
+
+### Major Feature: Show Status Visual Feedback
+
+#### Dynamic Button Dimming Based on Show Status
+**Problem:** Buttons for rundowns on stopped shows appeared the same as active shows, making it unclear which shows were operational. Users needed visual feedback to distinguish active vs inactive shows.
+
+**Solution:** Implemented proper Companion feedback pattern for dynamic button dimming:
+- Added `showStatusInactive` boolean feedback that triggers when associated show stops
+- Buttons automatically dim when show status changes (no manual refresh needed)
+- Color-matched dimming preserves original color hue (green→dim green, red→dim red, etc.)
+- All rundown button presets include show status feedback by default
+
+**Technical Implementation:**
+- **Feedback System:** `showStatusInactive` feedback in `feedbacks.js`
+  - Type: Boolean feedback
+  - Returns `true` when show is stopped (applies dim style)
+  - Returns `false` when show is running (no style override)
+  
+- **Color-Matched Dimming:** `dimColor()` helper function
+  - 50% desaturation (blends toward gray while preserving hue)
+  - 50% darkening (reduces brightness)
+  - Result: Recognizable color tint but clearly "inactive"
+  
+- **Automatic Updates:** `checkFeedbacks('showStatusInactive')` called in `features/engines.js`
+  - Triggered when show status changes (running → stopped or stopped → running)
+  - All placed buttons update instantly without requiring preset regeneration
+
+**Architecture:**
+- **Preset Library:** Shows full vibrant colors (attractive, clear)
+- **Placed Buttons:** Feedback handles dimming based on runtime show status
+- **Single Source of Truth:** Feedback system (proper Companion pattern)
+
+**Removed Static Dimming:**
+- Removed `getButtonColor()` function that dimmed preset colors at generation time
+- Presets now always use full vibrant colors
+- Dimming handled entirely via dynamic feedback system
+
+**User Experience:**
+- Buttons clearly indicate show status at a glance
+- Color hue preserved (green buttons stay greenish when dimmed, red stays reddish)
+- Updates automatically when show starts/stops (no manual refresh)
+- Works for all rundown buttons: Play, Out, Continue, Play Next, All Out, Nodos buttons
+
+### Files Changed
+
+- **`feedbacks.js`**
+  - Added `showStatusInactive` boolean feedback
+  - Checks show `running` or `started` status from `rundownToShowMap`
+
+- **`presets.js`**
+  - Removed `getButtonColor()` static dimming function
+  - Added `dimColor()` helper for color-matched dimming
+  - Added `createShowStatusFeedback()` helper to generate color-matched feedbacks
+  - All rundown button presets now include `showStatusInactive` feedback with matching dim colors
+
+- **`features/engines.js`**
+  - Added `getPresets` import
+  - Call `inst.setPresetDefinitions(getPresets(inst))` when show status changes
+  - Call `inst.checkFeedbacks('showStatusInactive')` to update placed buttons
+
+---
+
 ## 2025-12-30: Version 2.1.5 - Chained Update Architecture & Performance Optimization
 
 ### Major Architectural Changes
