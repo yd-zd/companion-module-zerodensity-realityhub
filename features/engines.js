@@ -9,6 +9,7 @@
 
 import { getActions } from '../actions.js'
 import { getVariables } from '../variables.js'
+import { getPresets } from '../presets.js'
 import { ms2S, isEqual, contains, shouldUpdate } from '../tools.js'
 
 
@@ -305,6 +306,12 @@ export const loadEngines = async (inst) => {
         
         // Update Action Definitions (dropdowns) immediately when show structure changes
         inst.setActionDefinitions(getActions(inst))
+        
+        // Update Preset Definitions to reflect show status (colors change for active/inactive shows)
+        inst.setPresetDefinitions(getPresets(inst))
+        
+        // Check show status feedbacks to update already-placed buttons
+        inst.checkFeedbacks('showStatusInactive')
         
         inst.log('info', `Updated: ${Object.keys(engines).length} Reality Engines, ${Object.keys(shows).length} Shows`)
     } else {

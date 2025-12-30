@@ -4,6 +4,41 @@ import { combineRgb } from '@companion-module/base'
 import { engineSelection } from './features/engines.js'
 import { variablePath } from './tools.js'
 
+// NOTE: Button dimming for inactive shows is handled via the 'showStatusInactive' feedback
+// Presets use full vibrant colors; feedback dynamically dims buttons when show stops
+
+/**
+ * Create a desaturated/dimmed version of a color for inactive show feedback
+ * Keeps the hue but reduces saturation and brightness
+ */
+const dimColor = (r, g, b) => {
+    // Desaturate: blend toward gray
+    const gray = Math.round((r + g + b) / 3)
+    const satFactor = 0.5  // 50% saturation
+    const newR = Math.round(r + (gray - r) * satFactor)
+    const newG = Math.round(g + (gray - g) * satFactor)
+    const newB = Math.round(b + (gray - b) * satFactor)
+    // Darken
+    const darkFactor = 0.5  // 50% brightness
+    return combineRgb(
+        Math.round(newR * darkFactor),
+        Math.round(newG * darkFactor),
+        Math.round(newB * darkFactor)
+    )
+}
+
+/**
+ * Create feedback object for show status dimming with color-matched style
+ */
+const createShowStatusFeedback = (rundownId, bgR, bgG, bgB) => ({
+    feedbackId: 'showStatusInactive',
+    options: { rundown: rundownId },
+    style: {
+        color: combineRgb(140, 140, 140),  // Dimmed white text
+        bgcolor: dimColor(bgR, bgG, bgB)   // Dimmed original color
+    }
+})
+
 export const getPresets = (inst) => {
     const presets = []
 
@@ -293,7 +328,7 @@ export const getPresets = (inst) => {
                         }
                     }]
                 }],
-                feedbacks: []
+                feedbacks: [createShowStatusFeedback(rID, 204, 0, 0)]  // Red dimmed
             })
             
             presets.push({
@@ -315,7 +350,7 @@ export const getPresets = (inst) => {
                         }
                     }]
                 }],
-                feedbacks: []
+                feedbacks: [createShowStatusFeedback(rID, 0, 153, 0)]  // Green dimmed
             })
             
             // ALL OUT buttons (Program All Out / Preview All Out)
@@ -338,7 +373,7 @@ export const getPresets = (inst) => {
                         }
                     }]
                 }],
-                feedbacks: []
+                feedbacks: [createShowStatusFeedback(rID, 255, 180, 0)]  // Orange dimmed
             })
             
             presets.push({
@@ -360,7 +395,7 @@ export const getPresets = (inst) => {
                         }
                     }]
                 }],
-                feedbacks: []
+                feedbacks: [createShowStatusFeedback(rID, 200, 150, 0)]  // Orange dimmed
             })
             totalPresetsCount += 4
             
@@ -402,7 +437,7 @@ export const getPresets = (inst) => {
                                 }
                             }]
                         }],
-                        feedbacks: []
+                        feedbacks: [createShowStatusFeedback(rID, 0, 128, 0)]  // Green dimmed
                     })
                     
                     // Out from Preview
@@ -426,7 +461,7 @@ export const getPresets = (inst) => {
                                 }
                             }]
                         }],
-                        feedbacks: []
+                        feedbacks: [createShowStatusFeedback(rID, 0, 80, 0)]  // Dark green dimmed
                     })
                     
                     // Play to Program (red - like in RealityHub UI)
@@ -450,7 +485,7 @@ export const getPresets = (inst) => {
                                 }
                             }]
                         }],
-                        feedbacks: []
+                        feedbacks: [createShowStatusFeedback(rID, 180, 0, 0)]  // Red dimmed
                     })
                     
                     // Out from Program
@@ -474,7 +509,7 @@ export const getPresets = (inst) => {
                                 }
                             }]
                         }],
-                        feedbacks: []
+                        feedbacks: [createShowStatusFeedback(rID, 100, 0, 0)]  // Dark red dimmed
                     })
                     
                     // Continue (yellow - for animation continue)
@@ -498,7 +533,7 @@ export const getPresets = (inst) => {
                                 }
                             }]
                         }],
-                        feedbacks: []
+                        feedbacks: [createShowStatusFeedback(rID, 255, 200, 0)]  // Yellow dimmed
                     })
                     
                     totalPresetsCount += 5
@@ -533,6 +568,7 @@ export const getPresets = (inst) => {
                                         }
                                     ],
                                     feedbacks: [
+                                        createShowStatusFeedback(rID, 0, 102, 0),  // Green dimmed
                                         {
                                             feedbackId: 'rundownButtonLabel',
                                             options: {

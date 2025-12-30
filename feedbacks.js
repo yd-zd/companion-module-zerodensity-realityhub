@@ -532,6 +532,46 @@ function createFeedbacks(inst) {
                 return { text: label }
             }
         }
+        
+        // Show Status feedback - dims buttons when associated show is not running
+        feedbacks.showStatusInactive = {
+            type: 'boolean',
+            name: 'Show Status: Inactive (Dim Button)',
+            description: 'Changes button appearance when the rundown\'s show is STOPPED. Add this feedback to dim buttons for inactive shows.',
+            options: [
+                {
+                    type: 'dropdown',
+                    label: 'Rundown:',
+                    id: 'rundown',
+                    default: Object.keys(inst.data.rundowns)[0] || '',
+                    choices: Object.entries(inst.data.rundowns).map(([rID, rd]) => {
+                        const showId = inst.data.rundownToShowMap?.[rID]
+                        const show = showId ? inst.data.shows?.[showId] : null
+                        const showName = show?.name || rd.showName || 'Unknown'
+                        return { id: rID, label: `${rd.name} (${showName})` }
+                    })
+                }
+            ],
+            defaultStyle: {
+                color: combineRgb(180, 180, 180),  // Gray text
+                bgcolor: combineRgb(50, 50, 50)    // Dark gray background
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                if (!rundownId) return false
+                
+                // Find the show for this rundown
+                const showId = inst.data.rundownToShowMap?.[rundownId]
+                if (!showId) return true  // No show mapping = inactive
+                
+                const show = inst.data.shows?.[showId]
+                if (!show) return true  // Show not found = inactive
+                
+                // Return TRUE if show is INACTIVE (to apply the dim style)
+                const isActive = show.running || show.started
+                return !isActive
+            }
+        }
     }
 
     // template feedbacks
