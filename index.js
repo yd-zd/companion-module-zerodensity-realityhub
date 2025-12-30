@@ -136,17 +136,27 @@ class RealityHubInstance extends InstanceBase {
 
 	async initModule(fastInit = false) {
 		// request "engines" data to check connection to host
-		if (await this.GET('engines') === null) {
+		let connectionSuccess = false
+		try {
+			const response = await this.GET('engines')
+			connectionSuccess = response !== null
+		} catch (error) {
+			this.log('debug', `Connection error: ${error.message}`)
+			connectionSuccess = false
+		}
+
+		if (!connectionSuccess) {
 			const retryDelay = 10
 			this.moduleInitiated = false
-			this.updateStatus('Connection Failed!')
-			this.log('info', 'Connection failed!')
-			this.log('debug', `Retry connection to host "${this.config.host}" in ${retryDelay}s`)
+			// Use 'disconnected' status - this is non-blocking and allows config editing
+			this.updateStatus('disconnected', `Cannot reach ${this.getBaseUrl()}`)
+			this.log('info', `Connection failed to ${this.getBaseUrl()}`)
+			this.log('debug', `Retry connection in ${retryDelay}s`)
 
 			// return if the module already retries
 			if (this.retryTimer !== undefined) return
 
-			// create retry timer
+			// create retry timer (non-blocking)
 			this.retryTimer = setTimeout(() => {
 				// return if connection is established now
 				if (this.connectionEstablished === true) return
@@ -274,7 +284,7 @@ class RealityHubInstance extends InstanceBase {
 		}
 	}
 
-	// handle errors
+	// handle errors (non-blocking)
 	async errorModule(error='unknown error', subject='unknown subject') {
 		if (this.requestErrorThreshold > this.requestErrors) return
 
@@ -282,7 +292,14 @@ class RealityHubInstance extends InstanceBase {
 		if (this.errors.last.error !== error && this.errors.last.subject !== subject) {
 			this.errors.last = { error: error, subject: subject }
 			this.log('error', `${error} for "${subject}"`)
-			this.updateStatus((error === 'TimeoutError') ? 'ConnectionFailure' : `ERROR: ${error}`)
+			// Use non-blocking status values
+			if (error === 'TimeoutError') {
+				this.updateStatus('connection_failure', 'Connection timeout')
+			} else if (error === 'Unauthorized' || error === 'Forbidden') {
+				this.updateStatus('bad_config', `API Key issue: ${error}`)
+			} else {
+				this.updateStatus('unknown_error', error)
+			}
 		}
 
 		// clear request cue if request errors occur
@@ -290,15 +307,19 @@ class RealityHubInstance extends InstanceBase {
 			this.executors.requests.clear()
 			this.connectionEstablished = false
 
-			if (await this.GET('engines') !== null) this.initModule()
+			try {
+				if (await this.GET('engines') !== null) this.initModule()
+			} catch (e) {
+				this.log('debug', `Reconnection attempt failed: ${e.message}`)
+			}
 		}
 	}
 
-	// update config and try to connect to init module
+	// update config and try to connect to init module (non-blocking)
 	async configUpdated(config, retry=false) {
 		// Safety check: ensure config object exists
 		if (!config) {
-			this.updateStatus('Waiting for config!')
+			this.updateStatus('bad_config', 'No configuration provided')
 			this.log('debug', 'No configuration provided yet')
 			return
 		}
@@ -306,7 +327,7 @@ class RealityHubInstance extends InstanceBase {
 		// Check for valid IP address (must be provided and look like an IP)
 		const host = config.host || ''
 		if (!host || host.split('.').length !== 4) {
-			this.updateStatus('Waiting for config!')
+			this.updateStatus('bad_config', 'Enter IP address')
 			this.log('debug', 'Waiting for valid RealityHub IP address')
 			return
 		}
@@ -314,7 +335,7 @@ class RealityHubInstance extends InstanceBase {
 		// Check for valid template pool name if templates feature is enabled
 		const features = config.features || []
 		if (contains(features, 'templates') && !config.templatePool) {
-			this.updateStatus('Waiting for config!')
+			this.updateStatus('bad_config', 'Template pool name required')
 			this.log('debug', 'Waiting for template pool name')
 			return
 		}
@@ -327,18 +348,25 @@ class RealityHubInstance extends InstanceBase {
 		await this.destroy()
 		this.executors.requests.unblock()
 
-		// reconnect, if host changed
-		if (this.config.host !== config.host || retry === true || featuresChanged === true ) {
+		// reconnect, if host, protocol or port changed
+		const connectionChanged = this.config.host !== config.host || 
+			this.config.protocol !== config.protocol || 
+			this.config.port !== config.port
+		if (connectionChanged || retry === true || featuresChanged === true ) {
 			// update config variable
 			this.config = config
 			this.errors.last = {}
 
 			this.updateStatus('connecting')
-			this.log('info', 'Try to connect...')
+			this.log('info', `Connecting to ${this.getBaseUrl()}...`)
 		
 			this.enableRequests = true
 			this.moduleInitiated = false
-			this.initModule()
+			// Non-blocking connection attempt
+			this.initModule().catch(err => {
+				this.log('error', `Init error: ${err.message}`)
+				this.updateStatus('connection_failure', 'Init failed')
+			})
 		}
 		// check if module can be initiated without reconnecting
 		else if (this.connectionEstablished) {
@@ -346,7 +374,10 @@ class RealityHubInstance extends InstanceBase {
 			this.config = config
 		
 			this.enableRequests = true
-			this.initModule(true)
+			this.initModule(true).catch(err => {
+				this.log('error', `Re-init error: ${err.message}`)
+				this.updateStatus('connection_failure', 'Re-init failed')
+			})
 		}
 	}
 
@@ -422,11 +453,28 @@ class RealityHubInstance extends InstanceBase {
 		}
 	}
 
-	GET = async (endpoint, body={}, importance='high') => this.REQ('GET', `http://${this.config.host}/api/rest/v1/${endpoint}`, body, importance)
-	POST = async (endpoint, body={}, importance='high') => this.REQ('POST', `http://${this.config.host}/api/rest/v1/${endpoint}`, body, importance)
-	PATCH = async (endpoint, body={}, importance='high') => this.REQ('PATCH', `http://${this.config.host}/api/rest/v1/${endpoint}`, body, importance)
-	PUT = async (endpoint, body={}, importance='high') => this.REQ('PUT', `http://${this.config.host}/api/rest/v1/${endpoint}`, body, importance)
-	DELETE = async (endpoint, body={}, importance='high') => this.REQ('DELETE', `http://${this.config.host}/api/rest/v1/${endpoint}`, body, importance)
+	// Helper to build base URL with protocol and port
+	getBaseUrl = () => {
+		const protocol = this.config.protocol || 'http'
+		const host = this.config.host
+		// Ensure port is a valid integer between 1-65535
+		let port = Math.floor(Number(this.config.port)) || 80
+		port = Math.max(1, Math.min(65535, port))
+		
+		// Include port in URL only if it's not the default for the protocol
+		const includePort = !(
+			(protocol === 'http' && port === 80) || 
+			(protocol === 'https' && port === 443)
+		)
+		
+		return `${protocol}://${host}${includePort ? ':' + port : ''}/api/rest/v1`
+	}
+
+	GET = async (endpoint, body={}, importance='high') => this.REQ('GET', `${this.getBaseUrl()}/${endpoint}`, body, importance)
+	POST = async (endpoint, body={}, importance='high') => this.REQ('POST', `${this.getBaseUrl()}/${endpoint}`, body, importance)
+	PATCH = async (endpoint, body={}, importance='high') => this.REQ('PATCH', `${this.getBaseUrl()}/${endpoint}`, body, importance)
+	PUT = async (endpoint, body={}, importance='high') => this.REQ('PUT', `${this.getBaseUrl()}/${endpoint}`, body, importance)
+	DELETE = async (endpoint, body={}, importance='high') => this.REQ('DELETE', `${this.getBaseUrl()}/${endpoint}`, body, importance)
 }
 
 runEntrypoint(RealityHubInstance, upgradeScripts)

@@ -13,13 +13,36 @@ export const createConfigFields = [
         value: 'This module connects to Zero Density RealityHub 2.1. An API key is required for authentication.',
     },
     {
+        type: 'dropdown',
+        id: 'protocol',
+        label: 'Protocol:',
+        width: 3,
+        default: 'http',
+        choices: [
+            { id: 'http', label: 'HTTP' },
+            { id: 'https', label: 'HTTPS (SSL)' },
+        ],
+        tooltip: 'Select HTTP or HTTPS protocol. Use HTTPS if your RealityHub server has SSL enabled.'
+    },
+    {
         type: 'textinput',
         id: 'host',
         label: 'IP Address:',
-        width: 6,
+        width: 5,
         default: '',
         regex: Regex.IP,
         tooltip: 'Enter the IP address of your RealityHub 2.1 server'
+    },
+    {
+        type: 'number',
+        id: 'port',
+        label: 'Port:',
+        width: 4,
+        default: 80,
+        min: 1,
+        max: 65535,
+        step: 1,
+        tooltip: 'Enter the port number (1-65535). Default is 80 for HTTP, 443 for HTTPS.'
     },
     {
         type: 'textinput',
