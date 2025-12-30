@@ -1,5 +1,93 @@
 # RealityHub Companion Module - Development Logbook
 
+## 2025-01-XX: Version 2.1.7 - Launch Control: Show Start/Stop Buttons
+
+### Major Feature: Launch Control Section
+
+#### Show Management via Companion Buttons
+**Problem:** Users needed a way to start and stop RealityHub shows directly from Companion buttons, with safety mechanisms to prevent accidental stops in production environments.
+
+**Solution:** Implemented a new "Launch Control" presets section that provides show start/stop functionality with built-in safety features:
+- **START button** - Safe single-press to launch shows
+- **STOP button** - Requires 3-second hold (prevents fat-finger accidents)
+- **STATUS button** - Display-only indicator showing show running/stopped state
+- Buttons automatically filtered by rundown filter (only shows with loaded rundowns appear)
+- Visual feedback updates in real-time as show status changes
+
+**Technical Implementation:**
+
+- **Actions (`actions.js`):**
+  - `launchShow` - Starts a show via `PUT /api/rest/v1/launcher/{showId}/launch`
+    - Checks if show is already running before attempting start
+    - Safe operation (single press, no confirmation needed)
+  - `stopShow` - Stops a show via `PUT /api/rest/v1/launcher/{showId}/stop`
+    - Uses Companion's native `runWhileHeld` feature for safety
+    - Requires 3-second hold before execution
+    - Automatically aborts if button released early
+
+- **Feedbacks (`feedbacks.js`):**
+  - `showRunning` - Boolean feedback returns `true` when show is running
+    - Applies green style when active
+  - `showStopped` - Boolean feedback returns `true` when show is stopped
+    - Applies gray style when inactive
+
+- **Presets (`presets.js`):**
+  - New "🚀 Launch Control: {ShowName}" category per show
+  - **START button:**
+    - Green color scheme
+    - Shows "✓ RUNNING" with bright green when show is active
+    - Single press to start
+  - **STOP button:**
+    - Gray when stopped, orange-red when running
+    - Uses `delay: 3000` and `runWhileHeld: true` for safety
+    - Text: "HOLD 3s TO STOP"
+  - **STATUS button:**
+    - Display-only (no action)
+    - Toggles between 🟢 RUNNING and ⚪ STOPPED states
+    - Updates automatically via feedbacks
+
+- **Engine Updates (`features/engines.js`):**
+  - Added `checkFeedbacks('showRunning')` and `checkFeedbacks('showStopped')` calls
+  - Ensures launch control buttons update when show status changes
+
+**Safety Mechanism:**
+- Uses Companion v3's native "Run While Held" feature (GitHub issue #1889)
+- `runWhileHeld: true` ensures action only executes if button is STILL held after delay
+- No manual configuration required - works out of the box
+- Prevents accidental stops from quick taps or fat-finger errors
+
+**User Experience:**
+- Launch Control buttons appear in presets for each show with loaded rundowns
+- Respects rundown filter (only filtered shows appear)
+- Clear visual feedback: Green = running, Gray = stopped, Orange = can stop
+- START is safe and immediate
+- STOP requires intentional 3-second hold
+- STATUS provides at-a-glance show state
+
+### Files Changed
+
+- **`actions.js`**
+  - Added `launchShow` action for starting shows
+  - Added `stopShow` action for stopping shows (with safety delay)
+  - Actions available when show data is loaded
+
+- **`feedbacks.js`**
+  - Added `showRunning` boolean feedback
+  - Added `showStopped` boolean feedback
+  - Feedbacks check `show.running` and `show.started` status
+
+- **`presets.js`**
+  - Added Launch Control presets section
+  - Creates START, STOP (3s hold), and STATUS buttons per show
+  - Buttons filtered by shows that have loaded rundowns
+  - Uses `runWhileHeld: true` for STOP button safety
+
+- **`features/engines.js`**
+  - Added feedback checks for `showRunning` and `showStopped`
+  - Ensures launch control buttons update when show status changes
+
+---
+
 ## 2025-12-30: Version 2.1.6 - Dynamic Button Dimming via Show Status Feedback
 
 ### Major Feature: Show Status Visual Feedback

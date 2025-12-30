@@ -981,6 +981,101 @@ function createActions(inst) {
         }
     }
 
+    // ========== LAUNCHER CONTROL ACTIONS ==========
+    // These control show start/stop - always available when we have show data
+    if (inst.data.shows && Object.keys(inst.data.shows).length > 0) {
+        // Create show selection dropdown
+        const showChoices = Object.entries(inst.data.shows).map(([showId, show]) => ({
+            id: showId,
+            label: `${show.name} ${show.running || show.started ? '🟢' : '⚪'}`
+        }))
+        
+        const showSelectionOption = {
+            type: 'dropdown',
+            label: 'Show:',
+            id: 'showId',
+            default: showChoices[0]?.id || '',
+            choices: showChoices,
+            tooltip: 'Select the show to control'
+        }
+        
+        // Start Show action
+        actions.launchShow = {
+            name: 'Launcher: Start Show',
+            description: 'Start (launch) a show. This will start all Reality Engines attached to the show.',
+            options: [showSelectionOption],
+            callback: async (event) => {
+                const showId = event.options.showId
+                if (!showId) {
+                    inst.log('error', 'No show selected')
+                    return
+                }
+                
+                const show = inst.data.shows?.[showId]
+                const showName = show?.name || showId
+                
+                // Check if already running
+                if (show?.running || show?.started) {
+                    inst.log('warn', `Show "${showName}" is already running`)
+                    return
+                }
+                
+                inst.log('info', `Starting show: ${showName}`)
+                
+                // PUT /api/rest/v1/launcher/{showId}/launch
+                const endpoint = `launcher/${showId}/launch`
+                try {
+                    const response = await inst.PUT(endpoint)
+                    if (response !== null) {
+                        inst.log('info', `Show "${showName}" start command sent successfully`)
+                    } else {
+                        inst.log('warn', `Show "${showName}" start may have failed`)
+                    }
+                } catch (e) {
+                    inst.log('error', `Failed to start show "${showName}": ${e.message}`)
+                }
+            }
+        }
+        
+        // Stop Show action - Preset uses "runWhileHeld" for 3-second hold safety
+        actions.stopShow = {
+            name: 'Launcher: Stop Show ⚠️',
+            description: '⚠️ CAUTION: Stop a running show. The Launch Control preset uses a 3-second hold requirement for safety. This action stops all Reality Engines attached to the show.',
+            options: [showSelectionOption],
+            callback: async (event) => {
+                const showId = event.options.showId
+                if (!showId) {
+                    inst.log('error', 'No show selected')
+                    return
+                }
+                
+                const show = inst.data.shows?.[showId]
+                const showName = show?.name || showId
+                
+                // Check if already stopped
+                if (!show?.running && !show?.started) {
+                    inst.log('warn', `Show "${showName}" is already stopped`)
+                    return
+                }
+                
+                inst.log('warn', `⚠️ STOPPING show: ${showName}`)
+                
+                // PUT /api/rest/v1/launcher/{showId}/stop
+                const endpoint = `launcher/${showId}/stop`
+                try {
+                    const response = await inst.PUT(endpoint)
+                    if (response !== null) {
+                        inst.log('info', `Show "${showName}" stop command sent successfully`)
+                    } else {
+                        inst.log('warn', `Show "${showName}" stop may have failed`)
+                    }
+                } catch (e) {
+                    inst.log('error', `Failed to stop show "${showName}": ${e.message}`)
+                }
+            }
+        }
+    }
+
     return actions
 }
 
