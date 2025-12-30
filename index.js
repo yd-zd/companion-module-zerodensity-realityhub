@@ -331,6 +331,9 @@ class RealityHubInstance extends InstanceBase {
 		for (const feature of features) if (!this.config.features.includes(feature)) featuresChanged = true
 		for (const feature of this.config.features) if (!features.includes(feature)) featuresChanged = true
 
+		// Detect rundown filter change (for immediate reload)
+		const filterChanged = this.config.showFilter !== config.showFilter
+
 		await this.destroy()
 		this.executors.requests.unblock()
 
@@ -364,6 +367,24 @@ class RealityHubInstance extends InstanceBase {
 				this.log('error', `Re-init error: ${err.message}`)
 				this.updateStatus('connection_failure', 'Re-init failed')
 			})
+
+			// If rundown filter changed, trigger immediate rundown reload
+			if (filterChanged && contains(features, 'rundowns')) {
+				this.log('info', `Rundown filter changed to: "${config.showFilter || '(none)'}". Reloading rundowns...`)
+				this.data.module.lastRundownUpdate = 0 // Force update
+				// IMPORTANT: Clear existing rundowns to apply filter fresh
+				// (Merge strategy would otherwise preserve old unfiltered data)
+				this.data.rundowns = {}
+				this.pollRundowns(this).then(() => {
+					// Refresh UI with new filtered data
+					this.setActionDefinitions(getActions(this))
+					this.setPresetDefinitions(getPresets(this))
+					this.checkFeedbacks()
+					this.log('info', 'Rundown filter applied successfully')
+				}).catch(err => {
+					this.log('error', `Failed to reload rundowns: ${err.message}`)
+				})
+			}
 		}
 	}
 

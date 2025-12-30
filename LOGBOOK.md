@@ -104,12 +104,38 @@ try {
 - Updated tooltip to clarify it filters by rundown names
 - Updated `HELP.md` documentation
 
+#### 11. Rundown Filter Immediate Apply
+**Problem:** Changing the Rundown Filter in config required a module restart/reconnect to take effect. The filter value was updated but rundowns were not reloaded immediately (only on next poll cycle).
+
+**Root Cause:** `configUpdated()` called `initModule(true)` with `fastInit=true`, which skips rundown loading to avoid slow re-initialization. Filter changes didn't trigger an immediate data reload.
+
+**Solution:** Added filter change detection in `configUpdated()`:
+```javascript
+const filterChanged = this.config.showFilter !== config.showFilter
+
+// After initModule(true)
+if (filterChanged && contains(features, 'rundowns')) {
+    this.log('info', `Rundown filter changed. Reloading rundowns...`)
+    this.data.module.lastRundownUpdate = 0  // Force update
+    this.data.rundowns = {}  // CRITICAL: Clear existing data before reload
+    this.pollRundowns(this).then(() => {
+        this.setActionDefinitions(getActions(this))
+        this.setPresetDefinitions(getPresets(this))
+        this.checkFeedbacks()
+    })
+}
+```
+**Critical Fix:** Must clear `this.data.rundowns = {}` before reload, because `loadRundowns()` uses a merge strategy (`{ ...inst.data.rundowns }`) that would otherwise preserve old unfiltered data.
+
+Now filter changes apply **instantly** without requiring reconnect.
+
 ### Files Changed
 
 - **`index.js`**
   - Removed separate timers for rundowns/nodes/templates
   - Added cache timestamps (`lastRundownUpdate`, etc.)
   - Fixed PUT request ParseError handling
+  - Added immediate rundown reload on filter change
 
 - **`features/engines.js`**
   - Added `getActions` import
