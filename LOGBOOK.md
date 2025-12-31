@@ -1,5 +1,134 @@
 # RealityHub Companion Module - Development Logbook
 
+## 2025-01-XX: Version 2.1.9 - Image Cycling Button Support (Planned)
+
+### Planned Feature: Image Cycling Buttons
+
+**Status:** Research completed, awaiting image assets
+
+**Feature Description:**
+- Support for PNG images on Companion buttons (72x58 or 72x72 pixels)
+- Button that cycles through multiple images on each press
+- Uses Companion's `png64` property (base64-encoded PNG) in button style
+- Multiple steps with different images for cycling behavior
+
+**Technical Notes:**
+- Companion supports `png64` property in button `style` object
+- Images must be base64-encoded PNG format
+- Button steps can have different images per step
+- Each press advances to next step, cycling through images
+
+**Implementation Plan:**
+- Create helper function to convert PNG files to base64
+- Add preset with multiple steps, each with different `png64` image
+- Support configurable number of images to cycle through
+- Add to presets as demo/non-functional button
+
+---
+
+## 2025-01-XX: Version 2.1.8 - Enhanced Launch Control: Double-Tap Safety & Engine Status Icons
+
+### Major Improvements: Launch Control Safety & Visual Feedback
+
+#### Double-Tap Confirmation for STOP Button
+**Problem:** The previous `runWhileHeld` implementation wasn't reliable - users could accidentally stop shows by holding briefly, releasing, and pressing again. A more robust safety mechanism was needed.
+
+**Solution:** Implemented a proper **double-tap confirmation system** with state tracking:
+- **First tap:** ARMs the stop action - button turns bright RED with "🔴 TAP AGAIN TO STOP!"
+- **Second tap within 3 seconds:** Executes the stop command
+- **No second tap within 3s:** Auto-disarms (must start over)
+- State is tracked in module memory, making it more reliable than Companion's built-in features
+
+**Technical Implementation:**
+- **Actions (`actions.js`):**
+  - Enhanced `stopShow` action with armed state tracking in `inst.data.stopArmed[showId]`
+  - Timestamp-based confirmation window (3 seconds)
+  - Auto-disarm timeout to prevent stale armed states
+  - Improved error handling: allows stop even if show not found in cache (handles stale data)
+  - Enhanced logging for debugging: shows action triggers, armed state, API calls, and responses
+  - Forces immediate engine poll after successful stop to update UI quickly
+
+- **Feedbacks (`feedbacks.js`):**
+  - Added `stopShowArmed` boolean feedback
+    - Returns `true` when stop is armed and within 3-second window
+    - Applies bright RED style with "🔴 TAP AGAIN TO STOP!" text
+    - Highest priority feedback (shown before running status)
+
+- **Presets (`presets.js`):**
+  - Updated STOP button to use double-tap pattern
+  - Removed `delay` and `runWhileHeld` properties (replaced with action-level state)
+  - Added `stopShowArmed` feedback with highest priority
+  - Button shows orange-red when running (can be stopped), gray when stopped
+
+**Safety Mechanism:**
+- Module-level state tracking ensures reliable double-tap detection
+- 3-second confirmation window prevents accidental stops
+- Auto-disarm prevents stale armed states
+- Clear visual feedback: RED = armed, Orange = can stop, Gray = stopped
+
+#### Engine Status Icons on Launch Control Buttons
+**Problem:** Users couldn't see the connection status of engines attached to shows. When a show appeared "running" but engines were disconnected, it was unclear what was wrong.
+
+**Solution:** Added **engine status icons** to Launch Control buttons showing real-time connection status of all engines attached to each show:
+- **🟢 Green** = Engine connected/ready
+- **🟡 Yellow** = Engine reconnecting
+- **🔴 Red** = Engine disconnected
+- **⚪ Gray** = Unknown status or no engines
+
+**Technical Implementation:**
+- **Helper Functions (`presets.js`):**
+  - `getEngineStatusIcon(status)` - Maps engine status to colored circle emoji
+  - `getShowEngineIcons(show, engines)` - Generates icon string for all engines in a show
+  - Icons update dynamically when presets regenerate (on each poll cycle)
+
+- **Presets (`presets.js`):**
+  - **START button:** Shows engine icons when show is running
+    - Format: `✓ RUNNING` + engine icons + show name
+    - Example: `✓ RUNNING\n🟢🟢\nShowName` (2 engines, both connected)
+  - **STATUS button:** Always shows engine icons
+    - Format: Show status icon + engine icons + show name + state
+    - Example: `🟢 🟢🟢\nShowName\nRUNNING` (running with 2 connected engines)
+    - Example: `⚪ 🟢🔴\nShowName\nSTOPPED` (stopped, one engine connected, one disconnected)
+
+**User Experience:**
+- At-a-glance engine health monitoring
+- Quickly identify which engines are having connection issues
+- Visual feedback updates automatically as engine status changes
+- Compact display: multiple engines shown as icon sequence (e.g., `🟢🟢🔴`)
+
+### Bug Fixes
+
+- **Stop Show Action Reliability:**
+  - Fixed issue where stop action would fail if show not found in cache
+  - Now proceeds with stop command even if cache is stale (handles async status updates)
+  - Added comprehensive logging to trace action execution and API calls
+  - Forces immediate engine poll after stop to refresh UI quickly
+
+- **Show Status Async Updates:**
+  - Improved handling of async show status updates
+  - Action no longer blocks on stale cache data
+  - Better error messages for debugging
+
+### Files Changed
+
+- **`actions.js`**
+  - Refactored `stopShow` to use double-tap confirmation with state tracking
+  - Added armed state management (`inst.data.stopArmed`)
+  - Enhanced logging for debugging
+  - Improved error handling for stale cache data
+  - Forces immediate poll after successful stop
+
+- **`feedbacks.js`**
+  - Added `stopShowArmed` boolean feedback for visual armed state indication
+
+- **`presets.js`**
+  - Added `getEngineStatusIcon()` and `getShowEngineIcons()` helper functions
+  - Updated START button to show engine icons when running
+  - Updated STATUS button to always show engine icons
+  - Updated STOP button to use double-tap pattern (removed `runWhileHeld`)
+
+---
+
 ## 2025-01-XX: Version 2.1.7 - Launch Control: Show Start/Stop Buttons
 
 ### Major Feature: Launch Control Section

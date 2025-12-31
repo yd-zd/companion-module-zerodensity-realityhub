@@ -671,6 +671,39 @@ function createFeedbacks(inst) {
                 return !show.running && !show.started
             }
         }
+        
+        // Stop Show Armed feedback - indicates if stop is ARMED (pending confirmation)
+        feedbacks.stopShowArmed = {
+            type: 'boolean',
+            name: 'Launcher: Stop ARMED (Pending Confirmation)',
+            description: 'Changes button appearance when the STOP action is ARMED and waiting for second tap. Button turns RED to indicate "TAP AGAIN TO STOP!"',
+            options: [
+                {
+                    type: 'dropdown',
+                    label: 'Show:',
+                    id: 'showId',
+                    default: showChoices[0]?.id || '',
+                    choices: showChoices
+                }
+            ],
+            defaultStyle: {
+                text: `🔴 TAP AGAIN\\nTO STOP!`,
+                color: combineRgb(255, 255, 255),
+                bgcolor: combineRgb(255, 0, 0)  // Bright RED - attention!
+            },
+            callback: (event) => {
+                const showId = event.options.showId
+                if (!showId) return false
+                
+                // Check if this show is armed for stopping
+                const armedTime = inst.data.stopArmed?.[showId]
+                if (!armedTime) return false
+                
+                // Check if still within timeout (3 seconds)
+                const now = Date.now()
+                return (now - armedTime) < 3000
+            }
+        }
     }
 
     return feedbacks

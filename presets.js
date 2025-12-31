@@ -39,6 +39,46 @@ const createShowStatusFeedback = (rundownId, bgR, bgG, bgB) => ({
     }
 })
 
+/**
+ * Get engine status icon based on connection status
+ * @param {string} status - Engine status: 'connected', 'ready', 'disconnected', 'reconnecting'
+ * @returns {string} Colored circle emoji
+ */
+const getEngineStatusIcon = (status) => {
+    switch (status?.toLowerCase()) {
+        case 'connected':
+        case 'ready':
+            return '🟢'  // Green - connected/ready
+        case 'reconnecting':
+            return '🟡'  // Yellow - reconnecting
+        case 'disconnected':
+            return '🔴'  // Red - disconnected
+        default:
+            return '⚪'  // Gray - unknown
+    }
+}
+
+/**
+ * Generate engine status icons string for a show
+ * Shows compact status of all engines attached to the show
+ * @param {object} show - Show object with renderers
+ * @param {object} engines - All engines data
+ * @returns {string} String of status icons like "🟢🟢" or "🟢🔴"
+ */
+const getShowEngineIcons = (show, engines) => {
+    if (!show?.renderers || show.renderers.length === 0) {
+        return '⚪'  // No engines attached
+    }
+    
+    const icons = show.renderers.map(renderer => {
+        const engineId = renderer.engineHostId
+        const engine = engines?.[engineId]
+        return getEngineStatusIcon(engine?.status)
+    })
+    
+    return icons.join('')
+}
+
 export const getPresets = (inst) => {
     const presets = []
 
@@ -313,10 +353,15 @@ export const getPresets = (inst) => {
             const isActive = show.running || show.started
             const statusIcon = isActive ? '🟢' : '⚪'
             
+            // Get engine status icons for this show
+            const engineIcons = getShowEngineIcons(show, inst.data.engines)
+            const engineCount = show.renderers?.length || 0
+            
             // Category for this show's launch controls
             const launchCategory = `🚀 Launch Control: ${showName}`
             
             // START button - Green, safe operation
+            // Shows engine status icons when running
             presets.push({
                 category: launchCategory,
                 name: `▶ START`,
@@ -338,7 +383,7 @@ export const getPresets = (inst) => {
                         feedbackId: 'showRunning',
                         options: { showId: showId },
                         style: {
-                            text: `✓ RUNNING\\n${showName}`,
+                            text: `✓ RUNNING\\n${engineIcons}\\n${showName}`,
                             color: combineRgb(255, 255, 255),
                             bgcolor: combineRgb(0, 180, 0)  // Bright green when running
                         }
@@ -346,14 +391,16 @@ export const getPresets = (inst) => {
                 ]
             })
             
-            // STOP button - HOLD 3 SECONDS to stop
-            // Uses Companion's "Run While Held" feature: only executes if held for full duration
+            // STOP button - Double-tap safety
+            // First tap: ARMS (button turns RED with "TAP AGAIN!")
+            // Second tap within 3s: EXECUTES stop
+            // Auto-disarms after 3 seconds if no second tap
             presets.push({
                 category: launchCategory,
-                name: `⏹ HOLD 3s STOP`,
+                name: `⏹ STOP (2x tap)`,
                 type: 'button',
                 style: {
-                    text: `⏹ HOLD 3s\\nTO STOP\\n${showName}`,
+                    text: `⏹ STOP\\n(tap 2x)\\n${showName}`,
                     size: '14',
                     color: combineRgb(200, 200, 200),
                     bgcolor: combineRgb(60, 60, 60)  // Gray when stopped
@@ -361,17 +408,26 @@ export const getPresets = (inst) => {
                 steps: [{
                     down: [{
                         actionId: 'stopShow',
-                        options: { showId: showId },
-                        delay: 3000,        // 3 second hold required
-                        runWhileHeld: true  // Only execute if still held after delay!
+                        options: { showId: showId }
                     }]
                 }],
                 feedbacks: [
                     {
+                        // ARMED state - highest priority (bright red, tap again!)
+                        feedbackId: 'stopShowArmed',
+                        options: { showId: showId },
+                        style: {
+                            text: `🔴 TAP AGAIN\\nTO STOP!`,
+                            color: combineRgb(255, 255, 255),
+                            bgcolor: combineRgb(255, 0, 0)  // Bright RED - attention!
+                        }
+                    },
+                    {
+                        // Running state - show can be stopped (orange-red)
                         feedbackId: 'showRunning',
                         options: { showId: showId },
                         style: {
-                            text: `⏹ HOLD 3s\\nTO STOP\\n⚠️ ${showName}`,
+                            text: `⏹ STOP\\n(tap 2x)\\n⚠️ ${showName}`,
                             color: combineRgb(255, 255, 255),
                             bgcolor: combineRgb(180, 60, 0)  // Orange-red when running
                         }
@@ -379,13 +435,14 @@ export const getPresets = (inst) => {
                 ]
             })
             
-            // STATUS button - Display-only, shows current state
+            // STATUS button - Display-only, shows current state with engine status icons
+            // Engine icons show connection status of each attached engine
             presets.push({
                 category: launchCategory,
                 name: `Status`,
                 type: 'button',
                 style: {
-                    text: `${statusIcon}\\n${showName}\\nSTATUS`,
+                    text: `${statusIcon} ${engineIcons}\\n${showName}\\nSTATUS`,
                     size: '14',
                     color: combineRgb(200, 200, 200),
                     bgcolor: combineRgb(40, 40, 40)
@@ -398,7 +455,7 @@ export const getPresets = (inst) => {
                         feedbackId: 'showRunning',
                         options: { showId: showId },
                         style: {
-                            text: `🟢\\n${showName}\\nRUNNING`,
+                            text: `🟢 ${engineIcons}\\n${showName}\\nRUNNING`,
                             color: combineRgb(255, 255, 255),
                             bgcolor: combineRgb(0, 100, 0)
                         }
@@ -407,7 +464,7 @@ export const getPresets = (inst) => {
                         feedbackId: 'showStopped',
                         options: { showId: showId },
                         style: {
-                            text: `⚪\\n${showName}\\nSTOPPED`,
+                            text: `⚪ ${engineIcons}\\n${showName}\\nSTOPPED`,
                             color: combineRgb(150, 150, 150),
                             bgcolor: combineRgb(60, 60, 60)
                         }
@@ -672,15 +729,18 @@ export const getPresets = (inst) => {
                         for (const [buttonKey, buttonLabel] of Object.entries(itemData.buttons)) {
                             // if button is valid add preset
                             if (buttonLabel !== undefined) {
+                                // Truncate long labels for button display
+                                const shortLabel = buttonLabel.length > 12 ? buttonLabel.substring(0, 11) + '…' : buttonLabel
+                                
                                 presets.push({
                                     category: itemCategory,  // Same category as playback controls
-                                    name: `${buttonLabel}`,
+                                    name: `${buttonLabel}`,  // Full name for tooltip
                                     type: 'button',
                                     style: {
-                                        text: buttonLabel,
-                                        size: '18',
+                                        text: shortLabel,  // Truncated label only
+                                        size: 'auto',  // Auto-size for better fit
                                         color: combineRgb(255, 255, 255),
-                                        bgcolor: combineRgb(0, 102, 0)
+                                        bgcolor: combineRgb(0, 153, 128)  // RealityHub form button color
                                     },
                                     steps: [
                                         {
@@ -697,19 +757,7 @@ export const getPresets = (inst) => {
                                         }
                                     ],
                                     feedbacks: [
-                                        createShowStatusFeedback(rID, 0, 102, 0),  // Green dimmed
-                                        {
-                                            feedbackId: 'rundownButtonLabel',
-                                            options: {
-                                                rundown: `r${rID}`,
-                                                [`r${rID}`]: `r${rID}_i${iID}`,
-                                                [`r${rID}_i${iID}`]: `r${rID}_i${iID}_b${buttonKey}`
-                                            },
-                                            style: {
-                                                color: combineRgb(255, 255, 255),
-                                                bgcolor: combineRgb(0, 51, 0)
-                                            }
-                                        }
+                                        createShowStatusFeedback(rID, 0, 153, 128)  // RealityHub form color dimmed
                                     ]
                                 })
                                 totalPresetsCount++

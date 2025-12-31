@@ -411,31 +411,51 @@ class RealityHubInstance extends InstanceBase {
 
 		try {
 			// Handle requests based on method
-            // Note: PUT requests often return 204 No Content or empty bodies, so we handle text response if JSON fails
+            // Note: POST/PUT/DELETE often return 204 No Content or empty bodies
+            // We gracefully handle ParseError for these command methods
 			if (method === 'GET') {
                 response = await got.get(url, parameters).json()
             }
 			else if (method === 'POST') {
-                response = await got.post(url, parameters).json()
+                // POST (button triggers, function calls) may return empty body
+                try {
+                    response = await got.post(url, parameters).json()
+                } catch (jsonError) {
+                    if (jsonError.name === 'ParseError') {
+                        // Empty body is OK for command endpoints - treat as success
+                        response = { success: true }
+                    } else {
+                        throw jsonError
+                    }
+                }
             }
 			else if (method === 'PATCH') {
                 response = await got.patch(url, parameters).json()
             }
 			else if (method === 'PUT') {
-                // For PUT, we accept text response if JSON parsing fails (common for 204 No Content)
+                // PUT (play/out/continue commands) may return empty body
                 try {
                     response = await got.put(url, parameters).json()
                 } catch (jsonError) {
                     if (jsonError.name === 'ParseError') {
-                        // If JSON parse fails, it might be an empty body (success)
-                        response = {} 
+                        // Empty body is OK for command endpoints - treat as success
+                        response = { success: true }
                     } else {
                         throw jsonError
                     }
                 }
             }
 			else if (method === 'DELETE') {
-                response = await got.delete(url, parameters).json()
+                // DELETE may also return empty body
+                try {
+                    response = await got.delete(url, parameters).json()
+                } catch (jsonError) {
+                    if (jsonError.name === 'ParseError') {
+                        response = { success: true }
+                    } else {
+                        throw jsonError
+                    }
+                }
             }
 
 			this.requestErrors = 0

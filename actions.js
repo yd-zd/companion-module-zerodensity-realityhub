@@ -1037,40 +1037,97 @@ function createActions(inst) {
             }
         }
         
-        // Stop Show action - Preset uses "runWhileHeld" for 3-second hold safety
+        // Stop Show action - Double-tap confirmation for safety
+        // First tap: ARM (button turns red with "TAP AGAIN!")
+        // Second tap within 3s: EXECUTE stop
+        // Timeout after 3s: Disarm (must start over)
         actions.stopShow = {
             name: 'Launcher: Stop Show ⚠️',
-            description: '⚠️ CAUTION: Stop a running show. The Launch Control preset uses a 3-second hold requirement for safety. This action stops all Reality Engines attached to the show.',
+            description: '⚠️ CAUTION: Stop a running show. Requires DOUBLE-TAP confirmation: first tap arms, second tap (within 3 seconds) executes. This stops all Reality Engines attached to the show.',
             options: [showSelectionOption],
             callback: async (event) => {
                 const showId = event.options.showId
+                inst.log('info', `stopShow action triggered for showId: ${showId}`)
+                
                 if (!showId) {
                     inst.log('error', 'No show selected')
                     return
                 }
                 
-                const show = inst.data.shows?.[showId]
-                const showName = show?.name || showId
+                // Try both string and number lookups (API might return different types)
+                let show = inst.data.shows?.[showId]
+                if (!show && typeof showId === 'string') {
+                    show = inst.data.shows?.[parseInt(showId, 10)]
+                }
+                if (!show && typeof showId === 'number') {
+                    show = inst.data.shows?.[String(showId)]
+                }
                 
-                // Check if already stopped
-                if (!show?.running && !show?.started) {
+                // If show not found in cache, still allow the stop command
+                // (The show might exist but our cache is stale)
+                if (!show) {
+                    inst.log('warn', `Show ${showId} not found in cache - proceeding with stop anyway`)
+                }
+                
+                const showName = show?.name || `Show ${showId}`
+                inst.log('debug', `Show status - running: ${show?.running}, started: ${show?.started}`)
+                
+                // Only skip if we KNOW the show is stopped (have data AND not running)
+                if (show && !show.running && !show.started) {
                     inst.log('warn', `Show "${showName}" is already stopped`)
                     return
                 }
                 
-                inst.log('warn', `⚠️ STOPPING show: ${showName}`)
+                // Initialize armed state storage if needed
+                if (!inst.data.stopArmed) {
+                    inst.data.stopArmed = {}
+                }
                 
-                // PUT /api/rest/v1/launcher/{showId}/stop
-                const endpoint = `launcher/${showId}/stop`
-                try {
-                    const response = await inst.PUT(endpoint)
-                    if (response !== null) {
-                        inst.log('info', `Show "${showName}" stop command sent successfully`)
-                    } else {
-                        inst.log('warn', `Show "${showName}" stop may have failed`)
+                const now = Date.now()
+                const armedTime = inst.data.stopArmed[showId]
+                const CONFIRM_TIMEOUT = 3000  // 3 seconds to confirm
+                
+                // Check if armed and within timeout
+                if (armedTime && (now - armedTime) < CONFIRM_TIMEOUT) {
+                    // ARMED and within timeout - EXECUTE STOP!
+                    inst.log('warn', `⚠️ CONFIRMED - STOPPING show: ${showName}`)
+                    
+                    // Clear armed state
+                    delete inst.data.stopArmed[showId]
+                    inst.checkFeedbacks('stopShowArmed')
+                    
+                    // PUT /api/rest/v1/launcher/{showId}/stop
+                    const endpoint = `launcher/${showId}/stop`
+                    inst.log('info', `Calling API: PUT ${endpoint}`)
+                    try {
+                        const response = await inst.PUT(endpoint)
+                        inst.log('debug', `Stop API response: ${JSON.stringify(response)}`)
+                        if (response !== null) {
+                            inst.log('info', `Show "${showName}" stop command sent successfully`)
+                            // Force immediate poll to update show status
+                            if (inst.pollEngines) {
+                                setTimeout(() => inst.pollEngines(inst), 1000)
+                            }
+                        } else {
+                            inst.log('warn', `Show "${showName}" stop may have failed (null response)`)
+                        }
+                    } catch (e) {
+                        inst.log('error', `Failed to stop show "${showName}": ${e.message}`)
                     }
-                } catch (e) {
-                    inst.log('error', `Failed to stop show "${showName}": ${e.message}`)
+                } else {
+                    // Not armed OR timeout expired - ARM NOW
+                    inst.data.stopArmed[showId] = now
+                    inst.log('warn', `🔴 ARMED to stop "${showName}" - TAP AGAIN within 3s to confirm!`)
+                    inst.checkFeedbacks('stopShowArmed')
+                    
+                    // Auto-disarm after timeout
+                    setTimeout(() => {
+                        if (inst.data.stopArmed?.[showId] === now) {
+                            delete inst.data.stopArmed[showId]
+                            inst.log('info', `Disarmed stop for "${showName}" (timeout)`)
+                            inst.checkFeedbacks('stopShowArmed')
+                        }
+                    }, CONFIRM_TIMEOUT)
                 }
             }
         }
