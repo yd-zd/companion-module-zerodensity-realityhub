@@ -95,6 +95,40 @@ const createItemPlayingPreviewFeedback = (rundownId, itemId) => ({
 })
 
 /**
+ * Create feedback for Program toggle button - changes color AND text symbol
+ * Shows ■ (stop) when playing, button shows ▶ (play) by default
+ */
+const createProgramToggleFeedback = (rundownId, itemId, shortName) => ({
+    feedbackId: 'itemPlayingInProgram',
+    options: { 
+        rundown: rundownId,
+        [`item_${rundownId}`]: itemId
+    },
+    style: {
+        color: combineRgb(255, 255, 255),
+        bgcolor: combineRgb(220, 38, 38),  // Bright red
+        text: `${shortName}\\n■ PGM`       // Stop symbol when playing
+    }
+})
+
+/**
+ * Create feedback for Preview toggle button - changes color AND text symbol
+ * Shows ■ (stop) when playing, button shows ▶ (play) by default
+ */
+const createPreviewToggleFeedback = (rundownId, itemId, shortName) => ({
+    feedbackId: 'itemPlayingInPreview',
+    options: { 
+        rundown: rundownId,
+        [`item_${rundownId}`]: itemId
+    },
+    style: {
+        color: combineRgb(255, 255, 255),
+        bgcolor: combineRgb(34, 197, 94),  // Bright green
+        text: `${shortName}\\n■ PVW`       // Stop symbol when playing
+    }
+})
+
+/**
  * Create feedback object for item offline - ORANGE WARNING when not ready on engine
  * Item exists in rundown but Reality Engine hasn't loaded it yet
  */
@@ -740,13 +774,13 @@ export const getPresets = (inst) => {
                     // 4. Item offline = orange warning (overrides all)
                     
                     // Preview Toggle (Green) - like RealityHub
-                    // Dark green when idle, BRIGHT GREEN when playing in Preview
+                    // ▶ PVW (dark green) when idle → ■ PVW (bright green) when playing
                     presets.push({
                         category: itemCategory,
                         name: `Preview Toggle`,
                         type: 'button',
                         style: {
-                            text: `${shortName}\\n▶ PVW`,
+                            text: `${shortName}\\n▶ PVW`,  // Play symbol when idle
                             size: '14',
                             color: combineRgb(255, 255, 255),
                             bgcolor: combineRgb(0, 80, 0)  // Dark green (idle state)
@@ -763,19 +797,19 @@ export const getPresets = (inst) => {
                         }],
                         feedbacks: [
                             createShowStatusFeedback(rID),                              // Gray when show stopped
-                            createItemPlayingPreviewFeedback(rID, iID),                 // Bright green when playing
+                            createPreviewToggleFeedback(rID, iID, shortName),           // Bright green + ■ symbol when playing
                             createItemOfflineFeedback(rID, iID)                         // Orange warning when offline
                         ]
                     })
                     
                     // Program Toggle (Red) - like RealityHub
-                    // Dark red when idle, BRIGHT RED when playing in Program
+                    // ▶ PGM (dark red) when idle → ■ PGM (bright red) when playing
                     presets.push({
                         category: itemCategory,
                         name: `Program Toggle`,
                         type: 'button',
                         style: {
-                            text: `${shortName}\\n▶ PGM`,
+                            text: `${shortName}\\n▶ PGM`,  // Play symbol when idle
                             size: '14',
                             color: combineRgb(255, 255, 255),
                             bgcolor: combineRgb(100, 0, 0)  // Dark red (idle state)
@@ -792,7 +826,7 @@ export const getPresets = (inst) => {
                         }],
                         feedbacks: [
                             createShowStatusFeedback(rID),                              // Gray when show stopped
-                            createItemPlayingProgramFeedback(rID, iID),                 // Bright red when playing
+                            createProgramToggleFeedback(rID, iID, shortName),           // Bright red + ■ symbol when playing
                             createItemOfflineFeedback(rID, iID)                         // Orange warning when offline
                         ]
                     })
