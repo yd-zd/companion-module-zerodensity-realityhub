@@ -15,9 +15,11 @@ RealityHub API v2.1.0 added two new fields to rundown items:
 
 **1. Item Online Status**
 - New helper function: `isItemOnline(inst, rundownId, itemId)`
-- New feedback: `itemOffline` - Orange warning when item not loaded
+- New feedback: `itemOffline` - Orange warning when item not ready
 - Applied to ALL item buttons as highest-priority feedback
-- Shows users which items cannot be played (not loaded on engine)
+- Shows users which items cannot be played
+
+**Note:** `status.online` indicates if item is loaded/ready on the **Reality Engine** (physical render machine). Item exists in rundown but engine hasn't loaded it yet (show stopped, engine disconnected, or still loading assets).
 
 **2. Item Type Display**
 - New helper function: `getItemType(inst, rundownId, itemId)`

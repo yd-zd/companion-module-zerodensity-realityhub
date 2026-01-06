@@ -735,12 +735,12 @@ function createFeedbacks(inst) {
             }
         }
         
-        // Item Offline - Shows when item is NOT online (not loaded on engine)
-        // Use this to indicate items that cannot be played
+        // Item Offline - Shows when item is NOT online (not ready on Reality Engine)
+        // The item exists in rundown but isn't loaded/ready on the physical render engine
         feedbacks.itemOffline = {
             type: 'boolean',
-            name: 'Item Status: Offline (Not Loaded)',
-            description: 'Shows warning style when item is OFFLINE (not loaded on engine). Use this to indicate items that cannot be played.',
+            name: 'Item Status: Offline (Not Ready on Engine)',
+            description: 'Shows warning when item is NOT ready on Reality Engine. Item exists in rundown but the engine hasn\'t loaded it yet (show stopped, engine disconnected, or still loading).',
             options: createItemSelectionOptions(),
             defaultStyle: {
                 // Warning appearance - orange/yellow tint with warning icon

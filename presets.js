@@ -95,7 +95,8 @@ const createItemPlayingPreviewFeedback = (rundownId, itemId) => ({
 })
 
 /**
- * Create feedback object for item offline - ORANGE WARNING when not loaded
+ * Create feedback object for item offline - ORANGE WARNING when not ready on engine
+ * Item exists in rundown but Reality Engine hasn't loaded it yet
  */
 const createItemOfflineFeedback = (rundownId, itemId) => ({
     feedbackId: 'itemOffline',

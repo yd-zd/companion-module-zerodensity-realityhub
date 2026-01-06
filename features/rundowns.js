@@ -83,7 +83,12 @@ export const isChannelAvailable = (inst, rundownId, itemId, channel) => {
 }
 
 /**
- * Check if item is online (loaded and ready on engine)
+ * Check if item is online (loaded and ready on Reality Engine)
+ * Note: Item exists in rundown (belongs to show), but needs to be loaded
+ * on the physical render engine to be playable. Offline when:
+ * - Show is stopped (engines not connected)
+ * - Engine disconnected/crashed
+ * - Engine still loading assets
  * @param {Object} inst - Module instance
  * @param {string|number} rundownId - Rundown ID
  * @param {string|number} itemId - Item ID
