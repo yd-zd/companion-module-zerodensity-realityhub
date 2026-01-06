@@ -1,5 +1,99 @@
 # RealityHub Companion Module - Development Logbook
 
+## 2026-01-05: Rundown Item Status API Enhancement (IMPLEMENTED)
+
+### New API Feature: Real-Time Item Status
+
+**Status:** ✅ IMPLEMENTED - Version 2.1.10
+
+**Background:**
+Reality Hub API has been enhanced with real-time status information for rundown items. The endpoint `GET /api/rest/v1/lino/rundown/{engineId}/{rundownId}/items` now returns runtime status for each item.
+
+**API Response Structure:**
+```json
+{
+  "id": 128,
+  "itemNo": 4,
+  "name": "News_LT_Logo",
+  "template": "News_LT_Logo",
+  "templateId": 5,
+  "buttons": {},
+  "data": {},
+  "status": {
+    "preview": "Available | Playing | Idle",
+    "program": "Available | Playing | Idle",
+    "isActive": true,
+    "activeIn": ["preview", "program"]
+  }
+}
+```
+
+**Status Field Values:**
+- **Available**: Channel is ready, item can be played
+- **Playing**: Item is currently playing on this channel
+- **Idle**: Item was playing but is now idle
+
+### Implementation Summary
+
+**Files Modified:**
+1. `features/rundowns.js` - Store item status, add helper functions
+2. `feedbacks.js` - 5 new feedback types for status visualization
+3. `presets.js` - Status-aware button colors with layered feedbacks
+
+### New Feedback Types
+
+| Feedback | Description | Color |
+|----------|-------------|-------|
+| `itemPlayingInProgram` | Item is ON AIR in Program | 🔴 Bright Red |
+| `itemPlayingInPreview` | Item is in Preview | 🟢 Bright Green |
+| `itemIsActive` | Item playing in any channel | 🟡 Yellow/Gold |
+| `itemStatusIndicator` | Multi-state (PGM/PVW/inactive) | Auto |
+| `itemNotActive` | Item is idle (desaturate) | 🌑 Dimmed |
+
+### Helper Functions Added (`features/rundowns.js`)
+
+```javascript
+getItemStatus(inst, rundownId, itemId)    // Get raw status object
+isItemPlaying(inst, rundownId, itemId, channel)  // Check if playing
+isItemActive(inst, rundownId, itemId)     // Check if active in any channel
+isChannelAvailable(inst, rundownId, itemId, channel)  // Check availability
+```
+
+### Button Color States
+
+Presets now have 3-layer feedback system:
+
+1. **Show Stopped** → Full gray (lowest priority)
+2. **Item Not Active** → Desaturated original color (medium)
+3. **Item Playing** → Bright color (highest priority)
+
+```
+Example for Play → Program button:
+- Show stopped:  Gray (#323232)
+- Item idle:     Dark desaturated red (#2D1919)  
+- Item playing:  Bright red (#DC2626)
+```
+
+### API Response Stored
+
+Each item now caches:
+```javascript
+item.status = {
+    preview: "Available" | "Playing" | "Idle",
+    program: "Available" | "Playing" | "Idle",
+    isActive: boolean,
+    activeIn: ["preview"] | ["program"] | ["preview", "program"]
+}
+```
+
+### Backward Compatibility
+
+- ✅ Works without status field (older API versions)
+- ✅ Graceful degradation: assume not playing if no status
+- ✅ Status feedbacks return false when status unavailable
+
+---
+
 ## 2025-01-XX: Version 2.1.9 - Image Cycling Button Support (Planned)
 
 ### Planned Feature: Image Cycling Buttons

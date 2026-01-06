@@ -4,22 +4,32 @@ import { combineRgb } from '@companion-module/base'
 import { engineSelection } from './features/engines.js'
 import { variablePath } from './tools.js'
 
-// NOTE: Button dimming for inactive shows is handled via the 'showStatusInactive' feedback
-// Presets use full vibrant colors; feedback dynamically dims buttons when show stops
+// NOTE: Button appearance is controlled by multiple feedback layers:
+// 1. showStatusInactive: Gray out when show is stopped
+// 2. itemNotActive: Desaturate when item is not playing  
+// 3. itemPlayingInProgram/Preview: Bright colors when playing
+// Feedback priority (last applied wins): show status < not active < playing status
 
 /**
- * Create a desaturated/dimmed version of a color for inactive show feedback
- * Keeps the hue but reduces saturation and brightness
+ * Create a grayed-out version of a color for inactive show feedback
+ * Used when the entire show is STOPPED - full gray
  */
-const dimColor = (r, g, b) => {
-    // Desaturate: blend toward gray
+const grayColor = () => combineRgb(50, 50, 50)
+
+/**
+ * Create a desaturated/dimmed version of a color for inactive item feedback
+ * Used when show is running but item is NOT playing
+ * Keeps hint of original hue but much darker and desaturated
+ */
+const desaturateColor = (r, g, b) => {
+    // Blend toward gray (desaturate)
     const gray = Math.round((r + g + b) / 3)
-    const satFactor = 0.5  // 50% saturation
+    const satFactor = 0.7  // 70% toward gray
     const newR = Math.round(r + (gray - r) * satFactor)
     const newG = Math.round(g + (gray - g) * satFactor)
     const newB = Math.round(b + (gray - b) * satFactor)
-    // Darken
-    const darkFactor = 0.5  // 50% brightness
+    // Darken significantly
+    const darkFactor = 0.4  // 40% brightness
     return combineRgb(
         Math.round(newR * darkFactor),
         Math.round(newG * darkFactor),
@@ -28,14 +38,59 @@ const dimColor = (r, g, b) => {
 }
 
 /**
- * Create feedback object for show status dimming with color-matched style
+ * Create feedback object for show status - GRAY when show stopped
  */
-const createShowStatusFeedback = (rundownId, bgR, bgG, bgB) => ({
+const createShowStatusFeedback = (rundownId) => ({
     feedbackId: 'showStatusInactive',
     options: { rundown: rundownId },
     style: {
-        color: combineRgb(140, 140, 140),  // Dimmed white text
-        bgcolor: dimColor(bgR, bgG, bgB)   // Dimmed original color
+        color: combineRgb(100, 100, 100),  // Gray text
+        bgcolor: grayColor()                // Full gray background
+    }
+})
+
+/**
+ * Create feedback object for item not active - DESATURATED when idle
+ */
+const createItemNotActiveFeedback = (rundownId, itemId, bgR, bgG, bgB) => ({
+    feedbackId: 'itemNotActive',
+    options: { 
+        rundown: rundownId,
+        [`item_${rundownId}`]: itemId
+    },
+    style: {
+        color: combineRgb(140, 140, 140),      // Dimmed white text
+        bgcolor: desaturateColor(bgR, bgG, bgB) // Desaturated original color
+    }
+})
+
+/**
+ * Create feedback object for item playing in Program - BRIGHT RED
+ */
+const createItemPlayingProgramFeedback = (rundownId, itemId) => ({
+    feedbackId: 'itemPlayingInProgram',
+    options: { 
+        rundown: rundownId,
+        [`item_${rundownId}`]: itemId
+    },
+    style: {
+        color: combineRgb(255, 255, 255),
+        bgcolor: combineRgb(220, 38, 38)  // Bright red
+    }
+})
+
+/**
+ * Create feedback object for item playing in Preview - BRIGHT GREEN
+ */
+const createItemPlayingPreviewFeedback = (rundownId, itemId) => ({
+    feedbackId: 'itemPlayingInPreview',
+    options: { 
+        rundown: rundownId,
+        [`item_${rundownId}`]: itemId
+    },
+    style: {
+        color: combineRgb(255, 255, 255),
+        bgcolor: combineRgb(34, 197, 94)  // Bright green
     }
 })
 
@@ -495,6 +550,7 @@ export const getPresets = (inst) => {
             const globalCategory = `${showPrefix} > ${rundown.name}: 🎬 Controls`
             
             // Play Next buttons in global controls
+            // These only gray out when show is stopped (no item-specific status)
             presets.push({
                 category: globalCategory,
                 name: `Play Next → Program`,
@@ -514,7 +570,7 @@ export const getPresets = (inst) => {
                         }
                     }]
                 }],
-                feedbacks: [createShowStatusFeedback(rID, 204, 0, 0)]  // Red dimmed
+                feedbacks: [createShowStatusFeedback(rID)]  // Gray when show stopped
             })
             
             presets.push({
@@ -536,7 +592,7 @@ export const getPresets = (inst) => {
                         }
                     }]
                 }],
-                feedbacks: [createShowStatusFeedback(rID, 0, 153, 0)]  // Green dimmed
+                feedbacks: [createShowStatusFeedback(rID)]  // Gray when show stopped
             })
             
             // ALL OUT buttons (Program All Out / Preview All Out)
@@ -559,7 +615,7 @@ export const getPresets = (inst) => {
                         }
                     }]
                 }],
-                feedbacks: [createShowStatusFeedback(rID, 255, 180, 0)]  // Orange dimmed
+                feedbacks: [createShowStatusFeedback(rID)]  // Gray when show stopped
             })
             
             presets.push({
@@ -581,7 +637,7 @@ export const getPresets = (inst) => {
                         }
                     }]
                 }],
-                feedbacks: [createShowStatusFeedback(rID, 200, 150, 0)]  // Orange dimmed
+                feedbacks: [createShowStatusFeedback(rID)]  // Gray when show stopped
             })
             totalPresetsCount += 4
             
@@ -601,8 +657,13 @@ export const getPresets = (inst) => {
                     const shortName = itemLabel.length > 10 ? itemLabel.substring(0, 9) + '…' : itemLabel
                     
                     // === PLAYBACK CONTROLS (standard for all items) ===
+                    // Feedback layers (applied in order, last wins):
+                    // 1. Show inactive = gray (lowest)
+                    // 2. Item not active = desaturated (medium)
+                    // 3. Item playing = bright (highest)
                     
                     // Play to Preview (green - like in RealityHub UI)
+                    // Turns BRIGHT GREEN when item is playing in Preview
                     presets.push({
                         category: itemCategory,
                         name: `Play → Preview`,
@@ -611,7 +672,7 @@ export const getPresets = (inst) => {
                             text: `${shortName}\\n▶ PVW`,
                             size: '14',
                             color: combineRgb(255, 255, 255),
-                            bgcolor: combineRgb(0, 128, 0)
+                            bgcolor: combineRgb(0, 128, 0)  // Base green
                         },
                         steps: [{
                             down: [{
@@ -623,7 +684,11 @@ export const getPresets = (inst) => {
                                 }
                             }]
                         }],
-                        feedbacks: [createShowStatusFeedback(rID, 0, 128, 0)]  // Green dimmed
+                        feedbacks: [
+                            createShowStatusFeedback(rID),                              // Gray when show stopped
+                            createItemNotActiveFeedback(rID, iID, 0, 128, 0),           // Desaturate when idle
+                            createItemPlayingPreviewFeedback(rID, iID)                  // Bright green when playing
+                        ]
                     })
                     
                     // Out from Preview
@@ -635,7 +700,7 @@ export const getPresets = (inst) => {
                             text: `${shortName}\\n■ PVW`,
                             size: '14',
                             color: combineRgb(255, 255, 255),
-                            bgcolor: combineRgb(0, 80, 0)
+                            bgcolor: combineRgb(0, 80, 0)  // Dark green base
                         },
                         steps: [{
                             down: [{
@@ -647,10 +712,15 @@ export const getPresets = (inst) => {
                                 }
                             }]
                         }],
-                        feedbacks: [createShowStatusFeedback(rID, 0, 80, 0)]  // Dark green dimmed
+                        feedbacks: [
+                            createShowStatusFeedback(rID),                              // Gray when show stopped
+                            createItemNotActiveFeedback(rID, iID, 0, 80, 0),            // Desaturate when idle
+                            createItemPlayingPreviewFeedback(rID, iID)                  // Bright green when playing
+                        ]
                     })
                     
                     // Play to Program (red - like in RealityHub UI)
+                    // Turns BRIGHT RED when item is playing in Program
                     presets.push({
                         category: itemCategory,
                         name: `Play → Program`,
@@ -659,7 +729,7 @@ export const getPresets = (inst) => {
                             text: `${shortName}\\n▶ PGM`,
                             size: '14',
                             color: combineRgb(255, 255, 255),
-                            bgcolor: combineRgb(180, 0, 0)
+                            bgcolor: combineRgb(180, 0, 0)  // Base red
                         },
                         steps: [{
                             down: [{
@@ -671,7 +741,11 @@ export const getPresets = (inst) => {
                                 }
                             }]
                         }],
-                        feedbacks: [createShowStatusFeedback(rID, 180, 0, 0)]  // Red dimmed
+                        feedbacks: [
+                            createShowStatusFeedback(rID),                              // Gray when show stopped
+                            createItemNotActiveFeedback(rID, iID, 180, 0, 0),           // Desaturate when idle
+                            createItemPlayingProgramFeedback(rID, iID)                  // Bright red when playing
+                        ]
                     })
                     
                     // Out from Program
@@ -683,7 +757,7 @@ export const getPresets = (inst) => {
                             text: `${shortName}\\n■ PGM`,
                             size: '14',
                             color: combineRgb(255, 255, 255),
-                            bgcolor: combineRgb(100, 0, 0)
+                            bgcolor: combineRgb(100, 0, 0)  // Dark red base
                         },
                         steps: [{
                             down: [{
@@ -695,10 +769,15 @@ export const getPresets = (inst) => {
                                 }
                             }]
                         }],
-                        feedbacks: [createShowStatusFeedback(rID, 100, 0, 0)]  // Dark red dimmed
+                        feedbacks: [
+                            createShowStatusFeedback(rID),                              // Gray when show stopped
+                            createItemNotActiveFeedback(rID, iID, 100, 0, 0),           // Desaturate when idle
+                            createItemPlayingProgramFeedback(rID, iID)                  // Bright red when playing
+                        ]
                     })
                     
                     // Continue (yellow - for animation continue)
+                    // Active when item is playing in EITHER channel
                     presets.push({
                         category: itemCategory,
                         name: `Continue`,
@@ -707,7 +786,7 @@ export const getPresets = (inst) => {
                             text: `${shortName}\\n⏯ CONT`,
                             size: '14',
                             color: combineRgb(0, 0, 0),
-                            bgcolor: combineRgb(255, 200, 0)
+                            bgcolor: combineRgb(255, 200, 0)  // Base yellow
                         },
                         steps: [{
                             down: [{
@@ -719,12 +798,18 @@ export const getPresets = (inst) => {
                                 }
                             }]
                         }],
-                        feedbacks: [createShowStatusFeedback(rID, 255, 200, 0)]  // Yellow dimmed
+                        feedbacks: [
+                            createShowStatusFeedback(rID),                              // Gray when show stopped
+                            createItemNotActiveFeedback(rID, iID, 255, 200, 0),         // Desaturate when idle
+                            createItemPlayingProgramFeedback(rID, iID),                 // Bright when in PGM
+                            createItemPlayingPreviewFeedback(rID, iID)                  // Bright when in PVW
+                        ]
                     })
                     
                     totalPresetsCount += 5
                     
                     // === NODOS FORM BUTTONS (if item has buttons) ===
+                    // These also get status-aware coloring
                     if (itemData.buttons && Object.keys(itemData.buttons).length > 0) {
                         for (const [buttonKey, buttonLabel] of Object.entries(itemData.buttons)) {
                             // if button is valid add preset
@@ -757,7 +842,10 @@ export const getPresets = (inst) => {
                                         }
                                     ],
                                     feedbacks: [
-                                        createShowStatusFeedback(rID, 0, 153, 128)  // RealityHub form color dimmed
+                                        createShowStatusFeedback(rID),                              // Gray when show stopped
+                                        createItemNotActiveFeedback(rID, iID, 0, 153, 128),         // Desaturate when idle
+                                        createItemPlayingProgramFeedback(rID, iID),                 // Bright when in PGM
+                                        createItemPlayingPreviewFeedback(rID, iID)                  // Bright when in PVW
                                     ]
                                 })
                                 totalPresetsCount++

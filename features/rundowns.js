@@ -6,11 +6,81 @@
 // - GET /lino/rundowns returns ALL rundowns (not filtered by show)
 // - We filter to only show rundowns that are loaded on running shows
 // - Use inst.data.rundownToShowMap to get the correct Show ID for API calls
+//
+// ITEM STATUS FEATURE:
+// - API returns status for each item: { preview, program, isActive, activeIn }
+// - status.preview / status.program: "Available" | "Playing" | "Idle"
+// - status.isActive: boolean (true if playing in any channel)
+// - status.activeIn: ["preview"] | ["program"] | ["preview", "program"]
 
 import { getActions } from '../actions.js'
 import { getFeedbacks } from '../feedbacks.js'
 import { getPresets } from '../presets.js'
 import { keyValueLogic, ms2S, isEqual } from '../tools.js'
+
+// ============ ITEM STATUS HELPER FUNCTIONS ============
+
+/**
+ * Get item status from cached rundown data
+ * @param {Object} inst - Module instance
+ * @param {string|number} rundownId - Rundown ID
+ * @param {string|number} itemId - Item ID
+ * @returns {Object|null} Status object or null if not available
+ */
+export const getItemStatus = (inst, rundownId, itemId) => {
+    const rundown = inst.data.rundowns?.[rundownId]
+    if (!rundown?.items) return null
+    
+    const item = rundown.items[itemId]
+    return item?.status || null
+}
+
+/**
+ * Check if item is playing in a specific channel
+ * @param {Object} inst - Module instance
+ * @param {string|number} rundownId - Rundown ID
+ * @param {string|number} itemId - Item ID
+ * @param {string} channel - 'program' or 'preview'
+ * @returns {boolean}
+ */
+export const isItemPlaying = (inst, rundownId, itemId, channel) => {
+    const status = getItemStatus(inst, rundownId, itemId)
+    if (!status) return false
+    
+    return status[channel] === 'Playing'
+}
+
+/**
+ * Check if item is active (playing in any channel)
+ * @param {Object} inst - Module instance
+ * @param {string|number} rundownId - Rundown ID
+ * @param {string|number} itemId - Item ID
+ * @returns {boolean}
+ */
+export const isItemActive = (inst, rundownId, itemId) => {
+    const status = getItemStatus(inst, rundownId, itemId)
+    if (!status) return false
+    
+    return status.isActive === true
+}
+
+/**
+ * Check if channel is available for an item
+ * @param {Object} inst - Module instance
+ * @param {string|number} rundownId - Rundown ID
+ * @param {string|number} itemId - Item ID
+ * @param {string} channel - 'program' or 'preview'
+ * @returns {boolean}
+ */
+export const isChannelAvailable = (inst, rundownId, itemId, channel) => {
+    const status = getItemStatus(inst, rundownId, itemId)
+    if (!status) return true // No status info = assume available
+    
+    const channelStatus = status[channel]
+    return ['Available', 'Playing', 'Idle'].includes(channelStatus)
+}
+
+// ============ END ITEM STATUS HELPER FUNCTIONS ============
 
 
 // Creates dropdown options for rundown selection (only loaded rundowns)
@@ -346,14 +416,21 @@ export const loadRundowns = async (inst) => {
 
         if (itemsData !== null && Array.isArray(itemsData)) {
             const newItems = {}
+            let statusCount = 0
+            
             for (const item of itemsData) {
                 const itemId = item.id
                 
                 newItems[itemId] = {
                     name: item.name,
                     template: item.template || null,
-                    buttons: {}
+                    buttons: {},
+                    // Store item status for feedback updates (NEW FEATURE)
+                    status: item.status || null
                 }
+                
+                // Count items with status for logging
+                if (item.status) statusCount++
 
                 // Update button labels
                 if (item.buttons) {
@@ -363,7 +440,11 @@ export const loadRundowns = async (inst) => {
                 }
             }
             newRundownEntry.items = newItems // Replace items with fresh data
-            // inst.log('info', `Loaded ${Object.keys(newItems).length} items for rundown "${rundown.name}" (Show: ${showInfo.showName})`)
+            
+            // Log status info for debugging
+            if (statusCount > 0) {
+                inst.log('debug', `Loaded ${Object.keys(newItems).length} items for "${rundown.name}" (${statusCount} with status)`)
+            }
         } else {
             // Log as debug, not warning (common for empty rundowns or during load)
             // inst.log('debug', `No items found for rundown "${rundown.name}" (ID: ${rundown.id}) on Show ${showId}`)
@@ -396,7 +477,24 @@ export const loadRundowns = async (inst) => {
         inst.setActionDefinitions(getActions(inst))
         inst.setFeedbackDefinitions(getFeedbacks(inst))
         inst.setPresetDefinitions(getPresets(inst))
-        inst.checkFeedbacks('rundownButtonLabel')
+        // Check all rundown-related feedbacks including item status
+        inst.checkFeedbacks(
+            'rundownButtonLabel',
+            'itemPlayingInProgram',
+            'itemPlayingInPreview',
+            'itemIsActive',
+            'itemStatusIndicator',
+            'showStatusInactive'
+        )
+    } else {
+        // Even if rundowns didn't change structurally, item status may have changed
+        // Check status feedbacks on every poll
+        inst.checkFeedbacks(
+            'itemPlayingInProgram',
+            'itemPlayingInPreview',
+            'itemIsActive',
+            'itemStatusIndicator'
+        )
     }
     
     // Set progress to 100%
