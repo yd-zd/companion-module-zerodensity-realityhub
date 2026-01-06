@@ -4,6 +4,19 @@ import { combineRgb } from '@companion-module/base'
 import { engineSelection } from './features/engines.js'
 import { variablePath } from './tools.js'
 
+/**
+ * Shorten label by extracting last segment after underscore
+ * Example: "News_FS_WindowText" → "WindowText"
+ * @param {string} label - Original label
+ * @param {boolean} enabled - Whether shortening is enabled
+ * @returns {string} Shortened or original label
+ */
+const shortenLabel = (label, enabled) => {
+    if (!enabled || !label || typeof label !== 'string') return label
+    const parts = label.split('_')
+    return parts.length > 1 ? parts[parts.length - 1] : label
+}
+
 // NOTE: Button appearance is controlled by multiple feedback layers:
 // 1. showStatusInactive: Gray out when show is stopped
 // 2. itemNotActive: Desaturate when item is not playing  
@@ -706,7 +719,7 @@ export const getPresets = (inst) => {
                 name: `CLEAR ← Program (v2.1)`,
                 type: 'button',
                 style: {
-                    text: `🗑️ CLEAR\\nPROGRAM`,
+                    text: `CLEAR\\nPGM`,
                     size: '14',
                     color: combineRgb(255, 255, 255),
                     bgcolor: combineRgb(180, 60, 60)  // Red-tinted for clear action
@@ -728,7 +741,7 @@ export const getPresets = (inst) => {
                 name: `CLEAR ← Preview (v2.1)`,
                 type: 'button',
                 style: {
-                    text: `🗑️ CLEAR\\nPREVIEW`,
+                    text: `CLEAR\\nPVW`,
                     size: '14',
                     color: combineRgb(255, 255, 255),
                     bgcolor: combineRgb(120, 60, 60)  // Darker red-tinted
@@ -751,7 +764,9 @@ export const getPresets = (inst) => {
             if (rundown.items) {
                 for (const [iID, itemData] of Object.entries(rundown.items)) {
                     // Use item name, falling back to template name, then ID
-                    const itemLabel = itemData.name || itemData.template || `Item #${iID}`
+                    const rawLabel = itemData.name || itemData.template || `Item #${iID}`
+                    // Apply shortening if enabled (e.g., "News_FS_WindowText" → "WindowText")
+                    const itemLabel = shortenLabel(rawLabel, inst.config.shortenLabels)
                     // Check if item has Nodos buttons (form controls)
                     const hasNodosButtons = itemData.buttons && Object.keys(itemData.buttons).length > 0
                     // Add 🎛️ icon for items with Nodos buttons to distinguish them

@@ -87,6 +87,15 @@ export const createConfigFields = [
         isVisible: (options) => Array.isArray(options.features) && options.features.includes('rundowns')
     },
     {
+        type: 'checkbox',
+        id: 'shortenLabels',
+        width: 12,
+        label: 'Shorten Item Labels (use last segment):',
+        default: false,
+        tooltip: 'If enabled, item labels like "News_FS_WindowText" will be shortened to "WindowText" (last segment after underscore). Useful for organized naming conventions.',
+        isVisible: (options) => Array.isArray(options.features) && options.features.includes('rundowns')
+    },
+    {
         type: 'static-text',
         id: 'info-warning',
         width: 12,
