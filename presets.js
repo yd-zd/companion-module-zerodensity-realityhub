@@ -731,28 +731,29 @@ export const getPresets = (inst) => {
                     // Shorten item name for button display (max ~10 chars)
                     const shortName = itemLabel.length > 10 ? itemLabel.substring(0, 9) + '…' : itemLabel
                     
-                    // === PLAYBACK CONTROLS (standard for all items) ===
+                    // === TOGGLE PLAYBACK CONTROLS (like RealityHub UI) ===
+                    // Single button per channel: Play when idle, Out when playing
                     // Feedback layers (applied in order, last wins):
                     // 1. Show inactive = gray (lowest)
-                    // 2. Item not active = desaturated (medium)
-                    // 3. Item playing = bright (high)
-                    // 4. Item offline = orange warning (highest - overrides all)
+                    // 2. Item not active = dark base color (medium)
+                    // 3. Item playing = bright color (highest)
+                    // 4. Item offline = orange warning (overrides all)
                     
-                    // Play to Preview (green - like in RealityHub UI)
-                    // Turns BRIGHT GREEN when item is playing in Preview
+                    // Preview Toggle (Green) - like RealityHub
+                    // Dark green when idle, BRIGHT GREEN when playing in Preview
                     presets.push({
                         category: itemCategory,
-                        name: `Play → Preview`,
+                        name: `Preview Toggle`,
                         type: 'button',
                         style: {
                             text: `${shortName}\\n▶ PVW`,
                             size: '14',
                             color: combineRgb(255, 255, 255),
-                            bgcolor: combineRgb(0, 128, 0)  // Base green
+                            bgcolor: combineRgb(0, 80, 0)  // Dark green (idle state)
                         },
                         steps: [{
                             down: [{
-                                actionId: 'rundownItemPlay',
+                                actionId: 'rundownItemToggle',
                                 options: {
                                     rundown: `r${rID}`,
                                     [`r${rID}`]: `r${rID}_i${iID}`,
@@ -762,56 +763,26 @@ export const getPresets = (inst) => {
                         }],
                         feedbacks: [
                             createShowStatusFeedback(rID),                              // Gray when show stopped
-                            createItemNotActiveFeedback(rID, iID, 0, 128, 0),           // Desaturate when idle
                             createItemPlayingPreviewFeedback(rID, iID),                 // Bright green when playing
                             createItemOfflineFeedback(rID, iID)                         // Orange warning when offline
                         ]
                     })
                     
-                    // Out from Preview
+                    // Program Toggle (Red) - like RealityHub
+                    // Dark red when idle, BRIGHT RED when playing in Program
                     presets.push({
                         category: itemCategory,
-                        name: `Out ← Preview`,
-                        type: 'button',
-                        style: {
-                            text: `${shortName}\\n■ PVW`,
-                            size: '14',
-                            color: combineRgb(255, 255, 255),
-                            bgcolor: combineRgb(0, 80, 0)  // Dark green base
-                        },
-                        steps: [{
-                            down: [{
-                                actionId: 'rundownItemOut',
-                                options: {
-                                    rundown: `r${rID}`,
-                                    [`r${rID}`]: `r${rID}_i${iID}`,
-                                    channel: '1'
-                                }
-                            }]
-                        }],
-                        feedbacks: [
-                            createShowStatusFeedback(rID),                              // Gray when show stopped
-                            createItemNotActiveFeedback(rID, iID, 0, 80, 0),            // Desaturate when idle
-                            createItemPlayingPreviewFeedback(rID, iID),                 // Bright green when playing
-                            createItemOfflineFeedback(rID, iID)                         // Orange warning when offline
-                        ]
-                    })
-                    
-                    // Play to Program (red - like in RealityHub UI)
-                    // Turns BRIGHT RED when item is playing in Program
-                    presets.push({
-                        category: itemCategory,
-                        name: `Play → Program`,
+                        name: `Program Toggle`,
                         type: 'button',
                         style: {
                             text: `${shortName}\\n▶ PGM`,
                             size: '14',
                             color: combineRgb(255, 255, 255),
-                            bgcolor: combineRgb(180, 0, 0)  // Base red
+                            bgcolor: combineRgb(100, 0, 0)  // Dark red (idle state)
                         },
                         steps: [{
                             down: [{
-                                actionId: 'rundownItemPlay',
+                                actionId: 'rundownItemToggle',
                                 options: {
                                     rundown: `r${rID}`,
                                     [`r${rID}`]: `r${rID}_i${iID}`,
@@ -821,36 +792,6 @@ export const getPresets = (inst) => {
                         }],
                         feedbacks: [
                             createShowStatusFeedback(rID),                              // Gray when show stopped
-                            createItemNotActiveFeedback(rID, iID, 180, 0, 0),           // Desaturate when idle
-                            createItemPlayingProgramFeedback(rID, iID),                 // Bright red when playing
-                            createItemOfflineFeedback(rID, iID)                         // Orange warning when offline
-                        ]
-                    })
-                    
-                    // Out from Program
-                    presets.push({
-                        category: itemCategory,
-                        name: `Out ← Program`,
-                        type: 'button',
-                        style: {
-                            text: `${shortName}\\n■ PGM`,
-                            size: '14',
-                            color: combineRgb(255, 255, 255),
-                            bgcolor: combineRgb(100, 0, 0)  // Dark red base
-                        },
-                        steps: [{
-                            down: [{
-                                actionId: 'rundownItemOut',
-                                options: {
-                                    rundown: `r${rID}`,
-                                    [`r${rID}`]: `r${rID}_i${iID}`,
-                                    channel: '0'
-                                }
-                            }]
-                        }],
-                        feedbacks: [
-                            createShowStatusFeedback(rID),                              // Gray when show stopped
-                            createItemNotActiveFeedback(rID, iID, 100, 0, 0),           // Desaturate when idle
                             createItemPlayingProgramFeedback(rID, iID),                 // Bright red when playing
                             createItemOfflineFeedback(rID, iID)                         // Orange warning when offline
                         ]
@@ -887,7 +828,7 @@ export const getPresets = (inst) => {
                         ]
                     })
                     
-                    totalPresetsCount += 5
+                    totalPresetsCount += 3  // Preview Toggle, Program Toggle, Continue
                     
                     // === NODOS FORM BUTTONS (if item has buttons) ===
                     // These also get status-aware coloring

@@ -1,7 +1,7 @@
 // actions
 
 import { nodeFunctionsOptions, nodePropertiesOptions } from './features/nodes.js'
-import { rundownButtonOptions, rundownItemOptions, rundownPlayNextOptions, refreshRundownItemStatus } from './features/rundowns.js'
+import { rundownButtonOptions, rundownItemOptions, rundownPlayNextOptions, refreshRundownItemStatus, isItemPlaying } from './features/rundowns.js'
 import { templateButtonOptions } from './features/templates.js'
 import { sString, contains, deepSetProperty, featureInactive, convertToFunctionId, featureLogic } from './tools.js'
 import { engineSelection } from './features/engines.js'
@@ -856,6 +856,41 @@ function createActions(inst) {
                 const response = await inst.PUT(endpoint)
                 if (response === null) {
                     inst.log('warn', `Continue item may have failed for: ${endpoint}`)
+                } else {
+                    // Refresh status immediately after successful command
+                    refreshRundownItemStatus(inst, showId, rundownId)
+                }
+            }
+        }
+
+        // Toggle Item: Play if not playing, Out if playing (like RealityHub UI)
+        actions.rundownItemToggle = {
+            name: 'Rundown: Toggle Item (Play/Out)',
+            description: 'Toggle item state: Play if not playing, Out if already playing. Single button control like RealityHub UI.',
+            options: rundownItemOptions(inst.data.rundowns, inst.data.rundownToShowMap, inst.data.shows),
+            callback: async (event) => {
+                const parsed = parseRundownItemSelection(event)
+                if (!parsed || !parsed.showId) {
+                    inst.log('error', 'Cannot toggle item: Invalid selection')
+                    return
+                }
+                
+                const { rundownId, showId, itemId, show, channel } = parsed
+                const channelName = channel === '1' ? 'Preview' : 'Program'
+                const channelKey = channel === '1' ? 'preview' : 'program'
+                
+                // Check current play state
+                const isPlaying = isItemPlaying(inst, rundownId, itemId, channelKey)
+                
+                // Toggle: Out if playing, Play if not
+                const action = isPlaying ? 'out' : 'play'
+                const endpoint = `lino/rundown/${showId}/${action}/${itemId}/${channel}`
+                
+                inst.log('debug', `Toggle ${channelName}: ${action.toUpperCase()} item ${itemId} (was ${isPlaying ? 'playing' : 'not playing'})`)
+                
+                const response = await inst.PUT(endpoint)
+                if (response === null) {
+                    inst.log('warn', `Toggle item may have failed for: ${endpoint}`)
                 } else {
                     // Refresh status immediately after successful command
                     refreshRundownItemStatus(inst, showId, rundownId)
