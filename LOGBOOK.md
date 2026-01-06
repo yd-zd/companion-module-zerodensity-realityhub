@@ -1,5 +1,47 @@
 # RealityHub Companion Module - Development Logbook
 
+## 2026-01-06: Optimistic UI & Button Debounce (v2.1.13)
+
+### Features
+
+**1. Optimistic UI Updates**
+When pressing play/out buttons, the visual state updates **immediately** before the API response arrives. This gives instant feedback to users.
+
+- Button color/symbol changes instantly on press
+- API call happens in background
+- Real state is refreshed from API to confirm
+- If API fails, state reverts automatically
+
+**2. Button Debounce (Cooldown)**
+Prevents rapid repeated button presses that could cause issues.
+
+- 1.5 second cooldown between presses of same button
+- Button ignores presses during cooldown period
+- Applies to: Play, Out, and Toggle actions
+- Each item/channel combination has its own cooldown
+
+### Implementation Details
+
+```javascript
+// Cooldown tracker
+const buttonCooldowns = {}
+const COOLDOWN_MS = 1500 // 1.5 seconds
+
+// Optimistic update flow:
+1. User presses button
+2. Check cooldown → skip if in cooldown
+3. Mark button as pressed (start cooldown)
+4. Apply optimistic update → immediate visual change
+5. Send API request
+6. On success → refresh real state from API
+7. On failure → revert to previous state
+```
+
+### Files Changed
+- `actions.js` - Added debounce tracking and optimistic update logic
+
+---
+
 ## RealityHub Architecture Reference
 
 Understanding this architecture is critical for working with the API:
