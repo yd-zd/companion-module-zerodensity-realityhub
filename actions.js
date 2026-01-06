@@ -1,7 +1,7 @@
 // actions
 
 import { nodeFunctionsOptions, nodePropertiesOptions } from './features/nodes.js'
-import { rundownButtonOptions, rundownItemOptions, rundownPlayNextOptions } from './features/rundowns.js'
+import { rundownButtonOptions, rundownItemOptions, rundownPlayNextOptions, refreshRundownItemStatus } from './features/rundowns.js'
 import { templateButtonOptions } from './features/templates.js'
 import { sString, contains, deepSetProperty, featureInactive, convertToFunctionId, featureLogic } from './tools.js'
 import { engineSelection } from './features/engines.js'
@@ -791,7 +791,7 @@ function createActions(inst) {
                     return
                 }
                 
-                const { showId, itemId, show, rundown, channel } = parsed
+                const { rundownId, showId, itemId, show, channel } = parsed
                 const channelName = channel === '1' ? 'Preview' : 'Program'
                 const endpoint = `lino/rundown/${showId}/play/${itemId}/${channel}`
                 
@@ -800,6 +800,9 @@ function createActions(inst) {
                 const response = await inst.PUT(endpoint)
                 if (response === null) {
                     inst.log('warn', `Play item may have failed for: ${endpoint}`)
+                } else {
+                    // Refresh status immediately after successful command
+                    refreshRundownItemStatus(inst, showId, rundownId)
                 }
             }
         }
@@ -816,7 +819,7 @@ function createActions(inst) {
                     return
                 }
                 
-                const { showId, itemId, show, channel } = parsed
+                const { rundownId, showId, itemId, show, channel } = parsed
                 const channelName = channel === '1' ? 'Preview' : 'Program'
                 const endpoint = `lino/rundown/${showId}/out/${itemId}/${channel}`
                 
@@ -825,6 +828,9 @@ function createActions(inst) {
                 const response = await inst.PUT(endpoint)
                 if (response === null) {
                     inst.log('warn', `Out item may have failed for: ${endpoint}`)
+                } else {
+                    // Refresh status immediately after successful command
+                    refreshRundownItemStatus(inst, showId, rundownId)
                 }
             }
         }
@@ -841,7 +847,7 @@ function createActions(inst) {
                     return
                 }
                 
-                const { showId, itemId, show, channel } = parsed
+                const { rundownId, showId, itemId, show, channel } = parsed
                 const channelName = channel === '1' ? 'Preview' : 'Program'
                 const endpoint = `lino/rundown/${showId}/continue/${itemId}/${channel}`
                 
@@ -850,6 +856,9 @@ function createActions(inst) {
                 const response = await inst.PUT(endpoint)
                 if (response === null) {
                     inst.log('warn', `Continue item may have failed for: ${endpoint}`)
+                } else {
+                    // Refresh status immediately after successful command
+                    refreshRundownItemStatus(inst, showId, rundownId)
                 }
             }
         }
@@ -886,6 +895,9 @@ function createActions(inst) {
                 const response = await inst.PUT(endpoint)
                 if (response === null) {
                     inst.log('warn', `Play next may have failed for: ${endpoint}`)
+                } else {
+                    // Refresh status immediately after successful command
+                    refreshRundownItemStatus(inst, showId, rundownId)
                 }
             }
         }
@@ -940,6 +952,11 @@ function createActions(inst) {
                 }
                 
                 inst.log('info', `All Out ${channelName}: ${successCount} succeeded, ${failCount} failed`)
+                
+                // Refresh status after all items processed
+                if (successCount > 0) {
+                    refreshRundownItemStatus(inst, showId, rundownId)
+                }
             }
         }
 
@@ -976,8 +993,12 @@ function createActions(inst) {
                     const response = await inst.PUT(endpoint)
                     if (response !== null) {
                         inst.log('info', `Clear Output: ${channelName} cleared successfully`)
+                        // Refresh status immediately after successful command
+                        refreshRundownItemStatus(inst, showId, rundownId)
                     } else {
                         inst.log('warn', `Clear Output: No response from API (may still have succeeded)`)
+                        // Try refresh anyway in case it succeeded
+                        refreshRundownItemStatus(inst, showId, rundownId)
                     }
                 } catch (e) {
                     inst.log('error', `Clear Output failed: ${e.message}`)

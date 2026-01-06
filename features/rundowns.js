@@ -138,6 +138,49 @@ export const getItemType = (inst, rundownId, itemId) => {
     return item?.itemType || null
 }
 
+/**
+ * Refresh item status for a specific rundown after play/out commands
+ * This provides immediate feedback update without waiting for next poll cycle
+ * @param {Object} inst - Module instance
+ * @param {string|number} showId - Show ID (Lino Engine ID)
+ * @param {string|number} rundownId - Rundown ID
+ * @param {number} delayMs - Optional delay before refresh (default: 100ms to allow engine state to update)
+ */
+export const refreshRundownItemStatus = async (inst, showId, rundownId, delayMs = 100) => {
+    // Small delay to allow engine state to propagate
+    if (delayMs > 0) {
+        await new Promise(resolve => setTimeout(resolve, delayMs))
+    }
+    
+    try {
+        const itemsData = await inst.GET(`lino/rundown/${showId}/${rundownId}/items/`, {}, 'fast')
+        
+        if (itemsData !== null && Array.isArray(itemsData) && inst.data.rundowns[rundownId]) {
+            // Update status for each item
+            for (const item of itemsData) {
+                const itemId = item.id
+                if (inst.data.rundowns[rundownId].items[itemId]) {
+                    inst.data.rundowns[rundownId].items[itemId].status = item.status || null
+                }
+            }
+            
+            // Update feedbacks immediately
+            inst.checkFeedbacks(
+                'itemPlayingInProgram',
+                'itemPlayingInPreview',
+                'itemIsActive',
+                'itemStatusIndicator',
+                'itemOffline',
+                'itemNotActive'
+            )
+            
+            inst.log('debug', `Refreshed item status for rundown ${rundownId}`)
+        }
+    } catch (e) {
+        inst.log('debug', `Failed to refresh item status: ${e.message}`)
+    }
+}
+
 // ============ END ITEM STATUS HELPER FUNCTIONS ============
 
 
