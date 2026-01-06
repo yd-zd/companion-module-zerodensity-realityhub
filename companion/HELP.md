@@ -2,6 +2,33 @@
 
 This module allows you to control Zero Density RealityHub 2.1 with comprehensive rundown playback control, engine management, and template automation.
 
+---
+
+### RealityHub Architecture
+
+Understanding these concepts helps when configuring actions:
+
+**Physical Layer - Reality Engines:**
+- Physical render machines running Nodos (e.g., ENG128, ENG129)
+- Each engine has **Dynamic Channels** (outputs like OnAir, Videowall)
+- Items render to these channels
+
+**Logical Layer - Shows:**
+- Logical groupings that attach to Reality Engines
+- **Rundowns** are loaded on Shows
+- **Items** in rundowns are assigned to Dynamic Channels
+
+**Playback:**
+- Items play to **Preview** (preview output) or **Program** (on-air output)
+- Like a broadcast mixer: Dynamic Channel = WHERE, Preview/Program = WHICH bus
+
+**Status Indicators (API v2.1.0+):**
+- **Online**: Item loaded on engine, ready to play
+- **Playing**: Item currently on-air in Preview or Program
+- **Unavailable**: Item cannot be played (engine issue)
+
+---
+
 **Requirements:**
 * The "REST API" server feature must be licensed and enabled (Configuration > License > Server Features > REST API)
 * A REST API key is required for authentication

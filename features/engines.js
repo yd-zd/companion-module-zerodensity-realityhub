@@ -1,10 +1,27 @@
 // engines
 // 
-// ARCHITECTURE NOTE:
-// - Reality Engines: Physical render machines (/api/rest/v1/engines) - IDs like 41, 42, 44
-// - Shows: Logical groupings that control engines (/api/rest/v1/launcher) - IDs like 60, 92, 96
-// - Lino "Engines": Same as Shows but with loadedRundownsInfo (/api/rest/v1/lino/engines)
-// 
+// ============ REALITYHUB ARCHITECTURE ============
+//
+// PHYSICAL LAYER (Reality Engines):
+//   GET /api/rest/v1/engines - Returns physical render machines
+//   IDs: 41, 42, 44... (e.g., ENG128, ENG129)
+//   - Each engine runs Nodos and has Dynamic Channels
+//   - Dynamic Channels: PGM_OnAir, PGM_Videowall (defined in Nodos graph)
+//   - Items render to these channels
+//
+// LOGICAL LAYER (Shows):
+//   GET /api/rest/v1/launcher - Returns shows with channels and attached engines
+//   GET /api/rest/v1/lino/engines - Returns "Lino Engines" (SAME as Shows!)
+//   IDs: 60, 92, 96...
+//   - Shows are logical groupings that ATTACH to Reality Engines
+//   - Rundowns are LOADED on Shows
+//   - Items in rundowns are assigned to Dynamic Channels
+//
+// CRITICAL API CONFUSION:
+//   - "Lino Engine" = Show (legacy naming)
+//   - All Lino API {engineId} parameters are actually SHOW IDs!
+//   - Use inst.data.rundownToShowMap to get correct Show ID for API calls
+//
 // We fetch BOTH /launcher (rich data) and /lino/engines (loadedRundownsInfo) and merge them
 
 import { getActions } from '../actions.js'

@@ -2,17 +2,39 @@
 //
 // Loads rundown data from RealityHub and creates button options for actions
 //
+// ============ REALITYHUB ARCHITECTURE ============
+//
+// PHYSICAL LAYER:
+//   Reality Engines (IDs: 41, 42, 44...)
+//     └── Physical render machines running Nodos
+//     └── Each engine has Dynamic Channels defined in Nodos graph
+//           e.g., PGM_OnAir (1920x1080), PGM_Videowall (1920x1080)
+//
+// LOGICAL LAYER:
+//   Shows (IDs: 60, 92, 96...)
+//     └── Logical groupings that attach to Reality Engines
+//     └── "Lino Engines" in API = Same as Shows (legacy naming)
+//     └── Rundowns are LOADED on Shows
+//           └── Items/Templates assigned to Dynamic Channels
+//
+// PLAYBACK:
+//   Items play to Preview (bus 1) or Program (bus 0) - like a broadcast mixer
+//   - Dynamic Channel: Physical output (OnAir, Videowall) - WHERE it renders
+//   - Preview/Program: Broadcast bus - WHICH output bus it goes to
+//
+// ============ API NOTES ============
+//
 // IMPORTANT: Rundowns must be LOADED on a RUNNING Show to trigger buttons
 // - GET /lino/rundowns returns ALL rundowns (not filtered by show)
 // - We filter to only show rundowns that are loaded on running shows
 // - Use inst.data.rundownToShowMap to get the correct Show ID for API calls
+// - All Lino {engineId} parameters are actually SHOW IDs, not Reality Engine IDs!
 //
-// ITEM STATUS FEATURE (API v2.1.0+):
-// - API returns status for each item: { preview, program, isActive, activeIn, online }
+// ITEM STATUS (API v2.1.0+):
 // - status.preview / status.program: "Available" | "Playing" | "Unavailable"
 // - status.isActive: boolean (true if playing in any channel)
 // - status.activeIn: ["preview"] | ["program"] | ["preview", "program"]
-// - status.online: boolean (whether item is loaded and ready on any engine)
+// - status.online: boolean (item loaded on engine's dynamic channel)
 
 import { getActions } from '../actions.js'
 import { getFeedbacks } from '../feedbacks.js'

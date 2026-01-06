@@ -1,5 +1,47 @@
 # RealityHub Companion Module - Development Logbook
 
+## RealityHub Architecture Reference
+
+Understanding this architecture is critical for working with the API:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     PHYSICAL LAYER                                  │
+├─────────────────────────────────────────────────────────────────────┤
+│  Reality Engines (GET /api/rest/v1/engines)                         │
+│  IDs: 41, 42, 44... (e.g., ENG128, ENG129)                          │
+│                                                                     │
+│    └── Each engine runs Nodos with a node graph                     │
+│          └── Dynamic Channels (outputs defined in graph)            │
+│                ├── Channel 0: PGM_OnAir (1920x1080)                 │
+│                └── Channel 1: PGM_Videowall (1920x1080)             │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              │ attached to
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                     LOGICAL LAYER                                   │
+├─────────────────────────────────────────────────────────────────────┤
+│  Shows (GET /api/rest/v1/launcher)                                  │
+│  IDs: 60, 92, 96... (e.g., "Main Show", "Studio B")                 │
+│                                                                     │
+│  ⚠️  "Lino Engines" (GET /lino/engines) = SAME AS SHOWS!            │
+│      All Lino API {engineId} parameters are actually SHOW IDs!      │
+│                                                                     │
+│    └── Rundowns (loaded on Shows)                                   │
+│          └── Items/Templates                                        │
+│                └── Assigned to Dynamic Channel (OnAir/Videowall)    │
+│                      └── Play to Preview (bus 1) or Program (bus 0) │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Concepts:**
+- **Dynamic Channel**: Physical output from Nodos graph (OnAir, Videowall) - WHERE it renders
+- **Preview/Program**: Broadcast bus like a video mixer - WHICH output bus it goes to
+- **status.online**: Item loaded on engine's dynamic channel (ready to play)
+
+---
+
 ## 2026-01-06: Item Online Status & Type Display (API v2.1.0)
 
 ### New Features: Online Status and Item Type
