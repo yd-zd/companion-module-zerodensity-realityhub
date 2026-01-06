@@ -629,7 +629,7 @@ export const getPresets = (inst) => {
                 name: `Play Next → Program`,
                 type: 'button',
                 style: {
-                    text: `▶▶ NEXT\\nPROGRAM`,
+                    text: `▶▶ NEXT\\nPGM`,
                     size: '14',
                     color: combineRgb(255, 255, 255),
                     bgcolor: combineRgb(204, 0, 0)
@@ -651,7 +651,7 @@ export const getPresets = (inst) => {
                 name: `Play Next → Preview`,
                 type: 'button',
                 style: {
-                    text: `▶▶ NEXT\\nPREVIEW`,
+                    text: `▶▶ NEXT\\nPVW`,
                     size: '14',
                     color: combineRgb(255, 255, 255),
                     bgcolor: combineRgb(0, 153, 0)
