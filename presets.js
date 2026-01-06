@@ -639,7 +639,52 @@ export const getPresets = (inst) => {
                 }],
                 feedbacks: [createShowStatusFeedback(rID)]  // Gray when show stopped
             })
-            totalPresetsCount += 4
+            
+            // CLEAR OUTPUT buttons (API v2.1.0 - single API call, more efficient)
+            presets.push({
+                category: globalCategory,
+                name: `CLEAR ← Program (v2.1)`,
+                type: 'button',
+                style: {
+                    text: `🗑️ CLEAR\\nPROGRAM`,
+                    size: '14',
+                    color: combineRgb(255, 255, 255),
+                    bgcolor: combineRgb(180, 60, 60)  // Red-tinted for clear action
+                },
+                steps: [{
+                    down: [{
+                        actionId: 'clearOutput',
+                        options: {
+                            rundown: `r${rID}`,
+                            channel: '0'
+                        }
+                    }]
+                }],
+                feedbacks: [createShowStatusFeedback(rID)]  // Gray when show stopped
+            })
+            
+            presets.push({
+                category: globalCategory,
+                name: `CLEAR ← Preview (v2.1)`,
+                type: 'button',
+                style: {
+                    text: `🗑️ CLEAR\\nPREVIEW`,
+                    size: '14',
+                    color: combineRgb(255, 255, 255),
+                    bgcolor: combineRgb(120, 60, 60)  // Darker red-tinted
+                },
+                steps: [{
+                    down: [{
+                        actionId: 'clearOutput',
+                        options: {
+                            rundown: `r${rID}`,
+                            channel: '1'
+                        }
+                    }]
+                }],
+                feedbacks: [createShowStatusFeedback(rID)]  // Gray when show stopped
+            })
+            totalPresetsCount += 6  // 4 original + 2 clear output
             
             // Add presets for each item - each item gets its own category
             // Combines BOTH playback controls AND Nodos form buttons

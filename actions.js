@@ -942,6 +942,48 @@ function createActions(inst) {
                 inst.log('info', `All Out ${channelName}: ${successCount} succeeded, ${failCount} failed`)
             }
         }
+
+        // Clear Output: Clear entire output channel (new in API v2.1.0)
+        // This is more efficient than rundownAllOut as it's a single API call
+        actions.clearOutput = {
+            name: 'Rundown: Clear Output (API v2.1.0)',
+            description: 'Clear the entire output channel (Program or Preview) with a single API call. More efficient than "All Out" which loops through items. Requires RealityHub 2.1.0+.',
+            options: rundownPlayNextOptions(inst.data.rundowns, inst.data.rundownToShowMap, inst.data.shows),
+            callback: async (event) => {
+                // Get Show ID from rundown selection
+                const rundownSelection = event.options.rundown
+                if (!rundownSelection) {
+                    inst.log('error', 'Cannot clear output: No rundown selected')
+                    return
+                }
+                
+                const rundownId = rundownSelection.substring(1) // Remove 'r' prefix
+                const rundown = inst.data.rundowns[rundownId]
+                const showId = rundown?.showId || rundown?.linoEngineId
+                const channel = event.options.channel || '0'
+                const channelName = channel === '1' ? 'Preview' : 'Program'
+                
+                if (!showId) {
+                    inst.log('error', 'Cannot clear output: No Show ID for rundown')
+                    return
+                }
+                
+                inst.log('info', `Clear Output: Clearing ${channelName} channel for Show ${showId}`)
+                
+                // Use the new clear endpoint (API v2.1.0)
+                const endpoint = `lino/rundown/${showId}/clear/${channel}`
+                try {
+                    const response = await inst.PUT(endpoint)
+                    if (response !== null) {
+                        inst.log('info', `Clear Output: ${channelName} cleared successfully`)
+                    } else {
+                        inst.log('warn', `Clear Output: No response from API (may still have succeeded)`)
+                    }
+                } catch (e) {
+                    inst.log('error', `Clear Output failed: ${e.message}`)
+                }
+            }
+        }
     }
 
     // set template actions if feature selected

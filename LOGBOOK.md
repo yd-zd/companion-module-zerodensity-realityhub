@@ -1,5 +1,45 @@
 # RealityHub Companion Module - Development Logbook
 
+## 2026-01-06: Clear Output Action (API v2.1.0)
+
+### New Feature: Clear Output Channel
+
+**Status:** ✅ IMPLEMENTED - Version 2.1.11
+
+**Background:**
+RealityHub API v2.1.0 introduced a new endpoint to clear output channels with a single API call:
+
+```
+PUT /api/rest/v1/lino/rundown/{engineId}/clear/{preview}
+  preview: 0 = Clear Program, 1 = Clear Preview
+```
+
+**Benefits vs All Out:**
+- **Single API call** instead of looping through all items
+- **Faster execution** - no network overhead per item
+- **More reliable** - atomic operation
+
+### Implementation
+
+**New Action: `clearOutput`**
+- Uses the new `PUT /lino/rundown/{showId}/clear/{channel}` endpoint
+- Same options as `rundownAllOut` (rundown + channel selection)
+- Requires RealityHub 2.1.0+
+
+**New Presets:**
+- `🗑️ CLEAR PROGRAM` - Red-tinted button to clear Program channel
+- `🗑️ CLEAR PREVIEW` - Darker red button to clear Preview channel
+- Located in `🎬 Controls` category alongside ALL OUT buttons
+
+### Files Changed
+
+- `actions.js` - Added `clearOutput` action
+- `presets.js` - Added CLEAR presets in Controls category
+- `package.json` - Version 2.1.11
+- `companion/manifest.json` - Version 2.1.11
+
+---
+
 ## 2026-01-05: Rundown Item Status API Enhancement (IMPLEMENTED)
 
 ### New API Feature: Real-Time Item Status
