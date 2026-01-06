@@ -9,7 +9,7 @@
 **Background:**
 Reality Hub API has been enhanced with real-time status information for rundown items. The endpoint `GET /api/rest/v1/lino/rundown/{engineId}/{rundownId}/items` now returns runtime status for each item.
 
-**API Response Structure:**
+**API Response Structure (v2.1.0+):**
 ```json
 {
   "id": 128,
@@ -20,10 +20,11 @@ Reality Hub API has been enhanced with real-time status information for rundown 
   "buttons": {},
   "data": {},
   "status": {
-    "preview": "Available | Playing | Idle",
-    "program": "Available | Playing | Idle",
+    "preview": "Available | Playing | Unavailable",
+    "program": "Available | Playing | Unavailable",
     "isActive": true,
-    "activeIn": ["preview", "program"]
+    "activeIn": ["preview", "program"],
+    "online": true
   }
 }
 ```
@@ -31,7 +32,7 @@ Reality Hub API has been enhanced with real-time status information for rundown 
 **Status Field Values:**
 - **Available**: Channel is ready, item can be played
 - **Playing**: Item is currently playing on this channel
-- **Idle**: Item was playing but is now idle
+- **Unavailable**: Item cannot be played (not loaded or engine offline)
 
 ### Implementation Summary
 
@@ -79,10 +80,11 @@ Example for Play → Program button:
 Each item now caches:
 ```javascript
 item.status = {
-    preview: "Available" | "Playing" | "Idle",
-    program: "Available" | "Playing" | "Idle",
+    preview: "Available" | "Playing" | "Unavailable",
+    program: "Available" | "Playing" | "Unavailable",
     isActive: boolean,
-    activeIn: ["preview"] | ["program"] | ["preview", "program"]
+    activeIn: ["preview"] | ["program"] | ["preview", "program"],
+    online: boolean
 }
 ```
 

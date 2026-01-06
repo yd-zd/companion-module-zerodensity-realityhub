@@ -63,10 +63,11 @@ Each item now includes a `status` object:
   "buttons": {},
   "data": {},
   "status": {
-    "preview": "Available | Playing | Idle",
-    "program": "Available | Playing | Idle",
+    "preview": "Available | Playing | Unavailable",
+    "program": "Available | Playing | Unavailable",
     "isActive": true,
-    "activeIn": ["preview", "program"]
+    "activeIn": ["preview", "program"],
+    "online": true
   }
 }
 ```
@@ -75,16 +76,17 @@ Each item now includes a `status` object:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `status.preview` | String | Preview channel state: "Available", "Playing", or "Idle" |
-| `status.program` | String | Program channel state: "Available", "Playing", or "Idle" |
+| `status.preview` | String | Preview channel state: "Available", "Playing", or "Unavailable" |
+| `status.program` | String | Program channel state: "Available", "Playing", or "Unavailable" |
 | `status.isActive` | Boolean | `true` if item is active in any channel |
 | `status.activeIn` | Array | List of channels where item is active: `["preview"]`, `["program"]`, or `["preview", "program"]` |
+| `status.online` | Boolean | Whether the item is online (loaded and ready) on any engine host |
 
 ### Status Values
 
 - **Available**: Channel is ready, item can be played
 - **Playing**: Item is currently playing/on-air on this channel
-- **Idle**: Item was previously playing but is now idle (transitioning state)
+- **Unavailable**: Item cannot be played (not loaded on engine or engine offline)
 
 ---
 
@@ -210,7 +212,8 @@ function isChannelAvailable(inst, itemId, channel) {
     if (!status) return true; // No status info, assume available
     
     const channelStatus = status[channel];
-    return ['Available', 'Playing', 'Idle'].includes(channelStatus);
+    // Official API uses "Unavailable" - channel is available if not Unavailable
+    return ['Available', 'Playing'].includes(channelStatus);
 }
 
 module.exports = {

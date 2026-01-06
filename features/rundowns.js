@@ -7,11 +7,12 @@
 // - We filter to only show rundowns that are loaded on running shows
 // - Use inst.data.rundownToShowMap to get the correct Show ID for API calls
 //
-// ITEM STATUS FEATURE:
-// - API returns status for each item: { preview, program, isActive, activeIn }
-// - status.preview / status.program: "Available" | "Playing" | "Idle"
+// ITEM STATUS FEATURE (API v2.1.0+):
+// - API returns status for each item: { preview, program, isActive, activeIn, online }
+// - status.preview / status.program: "Available" | "Playing" | "Unavailable"
 // - status.isActive: boolean (true if playing in any channel)
 // - status.activeIn: ["preview"] | ["program"] | ["preview", "program"]
+// - status.online: boolean (whether item is loaded and ready on any engine)
 
 import { getActions } from '../actions.js'
 import { getFeedbacks } from '../feedbacks.js'
@@ -77,7 +78,8 @@ export const isChannelAvailable = (inst, rundownId, itemId, channel) => {
     if (!status) return true // No status info = assume available
     
     const channelStatus = status[channel]
-    return ['Available', 'Playing', 'Idle'].includes(channelStatus)
+    // Official API uses "Unavailable", legacy may use "Idle" - support both
+    return ['Available', 'Playing'].includes(channelStatus)
 }
 
 // ============ END ITEM STATUS HELPER FUNCTIONS ============
