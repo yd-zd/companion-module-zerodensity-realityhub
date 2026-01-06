@@ -716,7 +716,8 @@ export const getPresets = (inst) => {
             // Combines BOTH playback controls AND Nodos form buttons
             if (rundown.items) {
                 for (const [iID, itemData] of Object.entries(rundown.items)) {
-                    const itemLabel = itemData.name || `Item #${iID}`
+                    // Use item name, falling back to template name, then ID
+                    const itemLabel = itemData.name || itemData.template || `Item #${iID}`
                     // Check if item has Nodos buttons (form controls)
                     const hasNodosButtons = itemData.buttons && Object.keys(itemData.buttons).length > 0
                     // Add 🎛️ icon for items with Nodos buttons to distinguish them

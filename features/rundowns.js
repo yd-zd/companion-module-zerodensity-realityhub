@@ -480,7 +480,8 @@ export const loadRundowns = async (inst) => {
                 const itemId = item.id
                 
                 newItems[itemId] = {
-                    name: item.name,
+                    // Store both name and template - either can be used for display
+                    name: item.name || item.template || null,
                     template: item.template || null,
                     buttons: {},
                     // Store item status for feedback updates (API v2.1.0)
