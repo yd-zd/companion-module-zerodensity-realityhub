@@ -82,6 +82,35 @@ export const isChannelAvailable = (inst, rundownId, itemId, channel) => {
     return ['Available', 'Playing'].includes(channelStatus)
 }
 
+/**
+ * Check if item is online (loaded and ready on engine)
+ * @param {Object} inst - Module instance
+ * @param {string|number} rundownId - Rundown ID
+ * @param {string|number} itemId - Item ID
+ * @returns {boolean}
+ */
+export const isItemOnline = (inst, rundownId, itemId) => {
+    const status = getItemStatus(inst, rundownId, itemId)
+    if (!status) return true // No status info = assume online (backward compat)
+    
+    return status.online === true
+}
+
+/**
+ * Get item type ('vs' = Nodos/VS, 'md' = Motion Design)
+ * @param {Object} inst - Module instance
+ * @param {string|number} rundownId - Rundown ID
+ * @param {string|number} itemId - Item ID
+ * @returns {string|null} 'vs', 'md', or null if not available
+ */
+export const getItemType = (inst, rundownId, itemId) => {
+    const rundown = inst.data.rundowns?.[rundownId]
+    if (!rundown?.items) return null
+    
+    const item = rundown.items[itemId]
+    return item?.itemType || null
+}
+
 // ============ END ITEM STATUS HELPER FUNCTIONS ============
 
 
@@ -427,8 +456,10 @@ export const loadRundowns = async (inst) => {
                     name: item.name,
                     template: item.template || null,
                     buttons: {},
-                    // Store item status for feedback updates (NEW FEATURE)
-                    status: item.status || null
+                    // Store item status for feedback updates (API v2.1.0)
+                    status: item.status || null,
+                    // Store item type: 'vs' = Nodos/VS, 'md' = Motion Design (API v2.1.0)
+                    itemType: item.itemType || null
                 }
                 
                 // Count items with status for logging
@@ -486,6 +517,9 @@ export const loadRundowns = async (inst) => {
             'itemPlayingInPreview',
             'itemIsActive',
             'itemStatusIndicator',
+            'itemOffline',
+            'itemTypeVS',
+            'itemTypeMD',
             'showStatusInactive'
         )
     } else {
@@ -495,7 +529,8 @@ export const loadRundowns = async (inst) => {
             'itemPlayingInProgram',
             'itemPlayingInPreview',
             'itemIsActive',
-            'itemStatusIndicator'
+            'itemStatusIndicator',
+            'itemOffline'
         )
     }
     

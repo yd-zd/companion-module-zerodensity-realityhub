@@ -95,6 +95,31 @@ const createItemPlayingPreviewFeedback = (rundownId, itemId) => ({
 })
 
 /**
+ * Create feedback object for item offline - ORANGE WARNING when not loaded
+ */
+const createItemOfflineFeedback = (rundownId, itemId) => ({
+    feedbackId: 'itemOffline',
+    options: { 
+        rundown: rundownId,
+        [`item_${rundownId}`]: itemId
+    },
+    style: {
+        color: combineRgb(50, 50, 50),
+        bgcolor: combineRgb(180, 100, 20)  // Orange warning
+    }
+})
+
+/**
+ * Get item type label for display ('VS' or 'MD')
+ * @param {Object} itemData - Item data object
+ * @returns {string} Type label or empty string
+ */
+const getItemTypeLabel = (itemData) => {
+    if (!itemData?.itemType) return ''
+    return itemData.itemType === 'vs' ? '[VS]' : itemData.itemType === 'md' ? '[MD]' : ''
+}
+
+/**
  * Get engine status icon based on connection status
  * @param {string} status - Engine status: 'connected', 'ready', 'disconnected', 'reconnecting'
  * @returns {string} Colored circle emoji
@@ -695,8 +720,11 @@ export const getPresets = (inst) => {
                     const hasNodosButtons = itemData.buttons && Object.keys(itemData.buttons).length > 0
                     // Add 🎛️ icon for items with Nodos buttons to distinguish them
                     const itemIcon = hasNodosButtons ? '🎛️ ' : ''
-                    // Create category per item: "ShowName > RundownName: [icon]ItemName"
-                    const itemCategory = `${showPrefix} > ${rundown.name}: ${itemIcon}${itemLabel}`
+                    // Get item type label (VS or MD) from API v2.1.0
+                    const typeLabel = getItemTypeLabel(itemData)
+                    const typeSuffix = typeLabel ? ` ${typeLabel}` : ''
+                    // Create category per item: "ShowName > RundownName: [icon]ItemName [TYPE]"
+                    const itemCategory = `${showPrefix} > ${rundown.name}: ${itemIcon}${itemLabel}${typeSuffix}`
                     
                     // Shorten item name for button display (max ~10 chars)
                     const shortName = itemLabel.length > 10 ? itemLabel.substring(0, 9) + '…' : itemLabel
@@ -705,7 +733,8 @@ export const getPresets = (inst) => {
                     // Feedback layers (applied in order, last wins):
                     // 1. Show inactive = gray (lowest)
                     // 2. Item not active = desaturated (medium)
-                    // 3. Item playing = bright (highest)
+                    // 3. Item playing = bright (high)
+                    // 4. Item offline = orange warning (highest - overrides all)
                     
                     // Play to Preview (green - like in RealityHub UI)
                     // Turns BRIGHT GREEN when item is playing in Preview
@@ -732,7 +761,8 @@ export const getPresets = (inst) => {
                         feedbacks: [
                             createShowStatusFeedback(rID),                              // Gray when show stopped
                             createItemNotActiveFeedback(rID, iID, 0, 128, 0),           // Desaturate when idle
-                            createItemPlayingPreviewFeedback(rID, iID)                  // Bright green when playing
+                            createItemPlayingPreviewFeedback(rID, iID),                 // Bright green when playing
+                            createItemOfflineFeedback(rID, iID)                         // Orange warning when offline
                         ]
                     })
                     
@@ -760,7 +790,8 @@ export const getPresets = (inst) => {
                         feedbacks: [
                             createShowStatusFeedback(rID),                              // Gray when show stopped
                             createItemNotActiveFeedback(rID, iID, 0, 80, 0),            // Desaturate when idle
-                            createItemPlayingPreviewFeedback(rID, iID)                  // Bright green when playing
+                            createItemPlayingPreviewFeedback(rID, iID),                 // Bright green when playing
+                            createItemOfflineFeedback(rID, iID)                         // Orange warning when offline
                         ]
                     })
                     
@@ -789,7 +820,8 @@ export const getPresets = (inst) => {
                         feedbacks: [
                             createShowStatusFeedback(rID),                              // Gray when show stopped
                             createItemNotActiveFeedback(rID, iID, 180, 0, 0),           // Desaturate when idle
-                            createItemPlayingProgramFeedback(rID, iID)                  // Bright red when playing
+                            createItemPlayingProgramFeedback(rID, iID),                 // Bright red when playing
+                            createItemOfflineFeedback(rID, iID)                         // Orange warning when offline
                         ]
                     })
                     
@@ -817,7 +849,8 @@ export const getPresets = (inst) => {
                         feedbacks: [
                             createShowStatusFeedback(rID),                              // Gray when show stopped
                             createItemNotActiveFeedback(rID, iID, 100, 0, 0),           // Desaturate when idle
-                            createItemPlayingProgramFeedback(rID, iID)                  // Bright red when playing
+                            createItemPlayingProgramFeedback(rID, iID),                 // Bright red when playing
+                            createItemOfflineFeedback(rID, iID)                         // Orange warning when offline
                         ]
                     })
                     
@@ -847,7 +880,8 @@ export const getPresets = (inst) => {
                             createShowStatusFeedback(rID),                              // Gray when show stopped
                             createItemNotActiveFeedback(rID, iID, 255, 200, 0),         // Desaturate when idle
                             createItemPlayingProgramFeedback(rID, iID),                 // Bright when in PGM
-                            createItemPlayingPreviewFeedback(rID, iID)                  // Bright when in PVW
+                            createItemPlayingPreviewFeedback(rID, iID),                 // Bright when in PVW
+                            createItemOfflineFeedback(rID, iID)                         // Orange warning when offline
                         ]
                     })
                     
@@ -890,7 +924,8 @@ export const getPresets = (inst) => {
                                         createShowStatusFeedback(rID),                              // Gray when show stopped
                                         createItemNotActiveFeedback(rID, iID, 0, 153, 128),         // Desaturate when idle
                                         createItemPlayingProgramFeedback(rID, iID),                 // Bright when in PGM
-                                        createItemPlayingPreviewFeedback(rID, iID)                  // Bright when in PVW
+                                        createItemPlayingPreviewFeedback(rID, iID),                 // Bright when in PVW
+                                        createItemOfflineFeedback(rID, iID)                         // Orange warning when offline
                                     ]
                                 })
                                 totalPresetsCount++

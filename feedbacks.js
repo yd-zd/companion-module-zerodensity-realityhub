@@ -2,7 +2,7 @@
 
 import { combineRgb } from '@companion-module/base'
 import { nodePropertiesOptions } from './features/nodes.js'
-import { rundownButtonOptions, getItemStatus, isItemPlaying, isItemActive } from './features/rundowns.js'
+import { rundownButtonOptions, getItemStatus, isItemPlaying, isItemActive, isItemOnline, getItemType } from './features/rundowns.js'
 import { templateButtonOptions } from './features/templates.js'
 import { contains, sString, basicFeedback, featureInactive, deepSetProperty } from './tools.js'
 import { engineSelection, engineSelectionSingle } from './features/engines.js'
@@ -732,6 +732,67 @@ function createFeedbacks(inst) {
                 
                 // Return TRUE if item is NOT active (to apply the desaturated style)
                 return !isItemActive(inst, rundownId, itemId)
+            }
+        }
+        
+        // Item Offline - Shows when item is NOT online (not loaded on engine)
+        // Use this to indicate items that cannot be played
+        feedbacks.itemOffline = {
+            type: 'boolean',
+            name: 'Item Status: Offline (Not Loaded)',
+            description: 'Shows warning style when item is OFFLINE (not loaded on engine). Use this to indicate items that cannot be played.',
+            options: createItemSelectionOptions(),
+            defaultStyle: {
+                // Warning appearance - orange/yellow tint with warning icon
+                color: combineRgb(50, 50, 50),
+                bgcolor: combineRgb(180, 100, 20)  // Orange warning
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return false
+                
+                // Return TRUE if item is OFFLINE (to apply the warning style)
+                return !isItemOnline(inst, rundownId, itemId)
+            }
+        }
+        
+        // Item Type Indicator - Shows different styles for VS vs MD items
+        feedbacks.itemTypeVS = {
+            type: 'boolean',
+            name: 'Item Type: Nodos/VS Item',
+            description: 'Activates when item is a Nodos/VS (Virtual Set) item. Use to add "VS" label or specific styling.',
+            options: createItemSelectionOptions(),
+            defaultStyle: {
+                // VS items get a subtle blue tint
+                color: combineRgb(255, 255, 255),
+                bgcolor: combineRgb(40, 80, 120)  // Blue tint for VS
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return false
+                
+                return getItemType(inst, rundownId, itemId) === 'vs'
+            }
+        }
+        
+        feedbacks.itemTypeMD = {
+            type: 'boolean',
+            name: 'Item Type: Motion Design Item',
+            description: 'Activates when item is a Motion Design item. Use to add "MD" label or specific styling.',
+            options: createItemSelectionOptions(),
+            defaultStyle: {
+                // MD items get a purple tint
+                color: combineRgb(255, 255, 255),
+                bgcolor: combineRgb(100, 40, 120)  // Purple tint for MD
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return false
+                
+                return getItemType(inst, rundownId, itemId) === 'md'
             }
         }
     }

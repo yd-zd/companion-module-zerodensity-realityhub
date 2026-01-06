@@ -1,5 +1,44 @@
 # RealityHub Companion Module - Development Logbook
 
+## 2026-01-06: Item Online Status & Type Display (API v2.1.0)
+
+### New Features: Online Status and Item Type
+
+**Status:** ✅ IMPLEMENTED - Version 2.1.11
+
+**Background:**
+RealityHub API v2.1.0 added two new fields to rundown items:
+- `status.online` - Boolean indicating if item is loaded and ready on engine
+- `itemType` - String ('vs' = Nodos/VS, 'md' = Motion Design)
+
+### Implementation
+
+**1. Item Online Status**
+- New helper function: `isItemOnline(inst, rundownId, itemId)`
+- New feedback: `itemOffline` - Orange warning when item not loaded
+- Applied to ALL item buttons as highest-priority feedback
+- Shows users which items cannot be played (not loaded on engine)
+
+**2. Item Type Display**
+- New helper function: `getItemType(inst, rundownId, itemId)`
+- New feedbacks: `itemTypeVS` and `itemTypeMD`
+- Item categories now show type label: `ItemName [VS]` or `ItemName [MD]`
+- Helps distinguish Nodos/Virtual Set items from Motion Design items
+
+### Feedback Priority (applied in order, last wins)
+1. Show stopped → gray (lowest)
+2. Item not active → desaturated
+3. Item playing → bright color
+4. **Item offline → orange warning (highest)**
+
+### Files Changed
+
+- `features/rundowns.js` - Store itemType, add isItemOnline/getItemType helpers
+- `feedbacks.js` - Add itemOffline, itemTypeVS, itemTypeMD feedbacks
+- `presets.js` - Add type labels to categories, add offline feedback to buttons
+
+---
+
 ## 2026-01-06: Clear Output Action (API v2.1.0)
 
 ### New Feature: Clear Output Channel
