@@ -1,5 +1,88 @@
 # RealityHub Companion Module - Development Logbook
 
+## 2026-01-15: RealityHub API v2.1.0+191 Adaptation (v2.1.15)
+
+### Breaking API Change: `/lino/engines` → `/lino/shows`
+
+RealityHub API v2.1.0+191 introduced a breaking change renaming the Lino endpoint:
+- **Old:** `GET /api/rest/v1/lino/engines`
+- **New:** `GET /api/rest/v1/lino/shows`
+
+The parameter `{engineId}` in Lino endpoints was also renamed to `{showId}` for clarity.
+
+### Changes Made
+
+**1. API Endpoint Update (`features/engines.js`)**
+```javascript
+// Before
+inst.GET('lino/engines', ...)
+
+// After
+inst.GET('lino/shows', ...)
+```
+
+**2. Comment Updates**
+Updated all comments referencing the old endpoint and parameter names:
+- `lino/engines` → `lino/shows`
+- `{engineId}` → `{showId}` in Lino API context
+- Clarified that "Lino Engine" was legacy naming for Shows
+
+**3. Documentation Updates**
+- `LOGBOOK.md` - Updated architecture reference
+- `docs/ITEM-STATUS-IMPLEMENTATION.md` - Updated endpoint examples and code samples
+
+### Files Changed
+- `features/engines.js` - API call and comments
+- `features/rundowns.js` - Comments only
+- `docs/ITEM-STATUS-IMPLEMENTATION.md` - Documentation examples
+- `LOGBOOK.md` - Architecture reference section
+
+### Backward Compatibility
+This is a **breaking change** from RealityHub. The module now requires RealityHub v2.1.0+191 or later.
+
+---
+
+## 2026-01-15: Skip Items API for Stopped Shows (v2.1.14)
+
+### Bug Fix: Eliminate 404 Errors for Stopped Shows
+
+**Problem:** The module was making API calls to `/lino/rundown/{showId}/{rundownId}/items` for ALL shows with loaded rundowns, including stopped shows. The API returns 404 errors for stopped shows because rundown items are only accessible when a show is running.
+
+**Impact:**
+- Unnecessary API traffic
+- 404 error responses logged by RealityHub server
+- Wasted network round-trips
+
+**Solution:** Added a running check before fetching rundown items:
+
+```javascript
+// Check if show is running (API requires running show for items endpoint)
+const isShowRunning = show && (show.running || show.started)
+
+// Skip API call if show is not running - preserve existing cached items
+if (!isShowRunning) {
+    // Keep existing items but mark all as offline
+    for (const itemId of Object.keys(existingItems)) {
+        if (existingItems[itemId].status) {
+            existingItems[itemId].status.online = false
+        }
+    }
+    return { key: rundownKey, data: newRundownEntry }
+}
+```
+
+**Benefits:**
+- ✅ Eliminates 404 errors from API
+- ✅ Reduces unnecessary API traffic
+- ✅ Preserves cached item data for stopped shows
+- ✅ Items marked as `online: false` for proper UI feedback
+- ✅ Faster polling cycles
+
+**Files Changed:**
+- `features/rundowns.js` - Added running check before items API call
+
+---
+
 ## 2026-01-06: Optimistic UI & Button Debounce (v2.1.13)
 
 ### Features
@@ -67,8 +150,8 @@ Understanding this architecture is critical for working with the API:
 │  Shows (GET /api/rest/v1/launcher)                                  │
 │  IDs: 60, 92, 96... (e.g., "Main Show", "Studio B")                 │
 │                                                                     │
-│  ⚠️  "Lino Engines" (GET /lino/engines) = SAME AS SHOWS!            │
-│      All Lino API {engineId} parameters are actually SHOW IDs!      │
+│  Shows with Rundowns (GET /lino/shows) - loadedRundownsInfo        │
+│      All Lino API {showId} parameters require SHOW IDs!             │
 │                                                                     │
 │    └── Rundowns (loaded on Shows)                                   │
 │          └── Items/Templates                                        │
@@ -135,7 +218,7 @@ RealityHub API v2.1.0 added two new fields to rundown items:
 RealityHub API v2.1.0 introduced a new endpoint to clear output channels with a single API call:
 
 ```
-PUT /api/rest/v1/lino/rundown/{engineId}/clear/{preview}
+PUT /api/rest/v1/lino/rundown/{showId}/clear/{preview}
   preview: 0 = Clear Program, 1 = Clear Preview
 ```
 
@@ -172,7 +255,7 @@ PUT /api/rest/v1/lino/rundown/{engineId}/clear/{preview}
 **Status:** ✅ IMPLEMENTED - Version 2.1.10
 
 **Background:**
-Reality Hub API has been enhanced with real-time status information for rundown items. The endpoint `GET /api/rest/v1/lino/rundown/{engineId}/{rundownId}/items` now returns runtime status for each item.
+Reality Hub API has been enhanced with real-time status information for rundown items. The endpoint `GET /api/rest/v1/lino/rundown/{showId}/{rundownId}/items` now returns runtime status for each item.
 
 **API Response Structure (v2.1.0+):**
 ```json
@@ -927,7 +1010,7 @@ All actions support channel selection (0 = Program, 1 = Preview) matching Realit
 ### Critical Fixes
 
 #### 2. Show Status Detection Consistency
-**Problem:** The `/launcher` API returns `running` property while `/lino/engines` returns `started` property. These can be inconsistent, causing rundowns to not load or button triggers to fail.
+**Problem:** The `/launcher` API returns `running` property while `/lino/shows` returns `started` property. These can be inconsistent, causing rundowns to not load or button triggers to fail.
 
 **Solution:** Updated all Show status checks to use `show.running || show.started` throughout the codebase:
 - `features/engines.js` - Show selection and rundownToShowMap building
@@ -937,7 +1020,7 @@ All actions support channel selection (0 = Program, 1 = Preview) matching Realit
 - `presets.js` - Preset category indicators
 
 #### 3. Rundown-to-Show Mapping
-**Problem:** The RealityHub API has confusing naming - Lino "engines" are actually "Shows", and `GET /lino/rundowns/{engineId}` returns ALL rundowns regardless of the engineId parameter.
+**Problem:** The RealityHub API naming can be confusing, and `GET /lino/rundowns` returns ALL rundowns regardless of the showId parameter.
 
 **Solution:** 
 - Built `rundownToShowMap` using `loadedRundownsInfo` from each Show
@@ -947,8 +1030,8 @@ All actions support channel selection (0 = Program, 1 = Preview) matching Realit
 **Key Architecture Understanding:**
 - **Reality Engines** (`/api/rest/v1/engines`) - Physical render machines (IDs: 41, 42, 44...)
 - **Shows** (`/api/rest/v1/launcher`) - Logical groupings controlling engines (IDs: 60, 92, 96...)
-- **Lino "Engines"** (`/api/rest/v1/lino/engines`) - **SAME AS SHOWS** (legacy naming confusion)
-- All Lino API `{engineId}` parameters are actually **Show IDs**
+- **Lino Shows** (`/api/rest/v1/lino/shows`) - Shows with loadedRundownsInfo
+- All Lino API `{showId}` parameters require **Show IDs**
 
 #### 4. Data Structure Initialization
 Added proper initialization of new data structures in `index.js`:
@@ -1087,7 +1170,7 @@ Despite rundowns being visible in the RealityHub dashboard and accessible via di
 | System | Endpoint | Purpose | Example IDs |
 |--------|----------|---------|-------------|
 | Reality Engines | `GET /api/rest/v1/engines` | Physical render engines | 41, 42, 44, 54, 56, 71 |
-| Lino Engines | `GET /api/rest/v1/lino/engines` | Rundown control engines | 60, 65, 77, 81, 89, 92 |
+| Lino Shows | `GET /api/rest/v1/lino/shows` | Shows with rundown info | 60, 65, 77, 81, 89, 92 |
 
 The companion module was incorrectly using Reality Engine IDs (e.g., `42`) for Lino API calls that require Lino Engine IDs (e.g., `77`).
 
@@ -1097,20 +1180,20 @@ The companion module was incorrectly using Reality Engine IDs (e.g., `42`) for L
 - Should have called: `GET /lino/rundown/77/110/items/` ✅
 
 ### Affected API Endpoints
-All Lino endpoints that include `{engineId}` in the path require **Lino Engine IDs**, not Reality Engine IDs:
+All Lino endpoints that include `{showId}` in the path require **Show IDs**, not Reality Engine IDs:
 
 ```
-GET  /api/rest/v1/lino/rundowns/{linoEngineId}
-GET  /api/rest/v1/lino/rundown/{linoEngineId}/{rundownId}/items/
-POST /api/rest/v1/lino/rundown/{linoEngineId}/{rundownId}/items/
-POST /api/rest/v1/lino/rundown/{linoEngineId}/{rundownId}/items/{itemId}/buttons/{buttonKey}
-PUT  /api/rest/v1/lino/rundown/{linoEngineId}/play/{itemId}/{preview}
-PUT  /api/rest/v1/lino/rundown/{linoEngineId}/out/{itemId}/{preview}
+GET  /api/rest/v1/lino/rundowns/{showId}
+GET  /api/rest/v1/lino/rundown/{showId}/{rundownId}/items
+POST /api/rest/v1/lino/rundown/{showId}/{rundownId}/items
+POST /api/rest/v1/lino/rundown/{showId}/{rundownId}/items/{itemId}/buttons/{buttonKey}
+PUT  /api/rest/v1/lino/rundown/{showId}/play/{itemId}/{preview}
+PUT  /api/rest/v1/lino/rundown/{showId}/out/{itemId}/{preview}
 ... etc
 ```
 
 ### Solution
-1. **`features/engines.js`**: Added call to `GET /api/rest/v1/lino/engines` to fetch Lino engines and store them in `inst.data.linoEngines`
+1. **`features/engines.js`**: Added call to `GET /api/rest/v1/lino/shows` to fetch Shows with loadedRundownsInfo and store them in `inst.data.shows`
 
 2. **`features/rundowns.js`**: Modified to iterate through each Lino engine, fetch its rundowns, and store the `linoEngineId` with each rundown for later use
 
@@ -1119,18 +1202,18 @@ PUT  /api/rest/v1/lino/rundown/{linoEngineId}/out/{itemId}/{preview}
 4. **`actions.js`**: Updated button trigger actions to use the stored `linoEngineId` from each rundown instead of a global ID
 
 ### Files Changed
-- `features/engines.js` - Fetch and store Lino engines
-- `features/rundowns.js` - Use Lino engine IDs for rundown/item queries
-- `features/templates.js` - Use Lino engine IDs for template pool
-- `actions.js` - Use correct Lino engine ID when triggering buttons
+- `features/engines.js` - Fetch and store Shows with rundown info
+- `features/rundowns.js` - Use Show IDs for rundown/item queries
+- `features/templates.js` - Use Show IDs for template pool
+- `actions.js` - Use correct Show ID when triggering buttons
 
 ### Reference Implementation
 The `rhub-api-dashboard` project correctly handles this in `src/lib/api.ts`:
 ```typescript
 lino: {
-    listEngines: () => request('GET', '/api/rest/v1/lino/engines'),
-    listRundowns: (engineId: number) => request('GET', `/api/rest/v1/lino/rundowns/${engineId}`),
-    listItems: (engineId: number, rundownId: number) => request('GET', `/api/rest/v1/lino/rundown/${engineId}/${rundownId}/items/`),
+    listShows: () => request('GET', '/api/rest/v1/lino/shows'),
+    listRundowns: (showId: number) => request('GET', `/api/rest/v1/lino/rundowns/${showId}`),
+    listItems: (showId: number, rundownId: number) => request('GET', `/api/rest/v1/lino/rundown/${showId}/${rundownId}/items/`),
     // ...
 }
 ```
@@ -1184,18 +1267,18 @@ GET  /api/rest/v1/playout/templates
 
 ### Lino Endpoints (USE THESE)
 ```
-GET  /api/rest/v1/lino/engines
-GET  /api/rest/v1/lino/rundowns/{engineId}
-GET  /api/rest/v1/lino/rundown/{engineId}/{rundownId}/items/
-POST /api/rest/v1/lino/rundown/{engineId}/{rundownId}/items/{itemId}/buttons/{buttonKey}
-PUT  /api/rest/v1/lino/rundown/{engineId}/play/{itemId}/{preview}
-PUT  /api/rest/v1/lino/rundown/{engineId}/out/{itemId}/{preview}
-PUT  /api/rest/v1/lino/rundown/{engineId}/continue/{itemId}/{preview}
+GET  /api/rest/v1/lino/shows
+GET  /api/rest/v1/lino/rundowns/{showId}
+GET  /api/rest/v1/lino/rundown/{showId}/{rundownId}/items
+POST /api/rest/v1/lino/rundown/{showId}/{rundownId}/items/{itemId}/buttons/{buttonKey}
+PUT  /api/rest/v1/lino/rundown/{showId}/play/{itemId}/{preview}
+PUT  /api/rest/v1/lino/rundown/{showId}/out/{itemId}/{preview}
+PUT  /api/rest/v1/lino/rundown/{showId}/continue/{itemId}/{preview}
 GET  /api/rest/v1/lino/templates
 ```
 
 ### Key Difference
-Lino requires a **Lino Engine ID** in the path, while Playout uses only rundown IDs. See the "Lino Engine ID vs Reality Engine ID" section above for details on obtaining correct Lino Engine IDs.
+Lino requires a **Show ID** in the path, while Playout uses only rundown IDs. See the "Rundown-to-Show Mapping" section above for details on obtaining correct Show IDs.
 
 ---
 

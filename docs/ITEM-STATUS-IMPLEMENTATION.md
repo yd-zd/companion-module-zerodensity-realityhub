@@ -46,7 +46,7 @@ Reality Hub API now returns real-time status information for rundown items, incl
 ### Endpoint
 
 ```
-GET /api/rest/v1/lino/rundown/{engineId}/{rundownId}/items
+GET /api/rest/v1/lino/rundown/{showId}/{rundownId}/items
 ```
 
 ### Response Schema
@@ -127,7 +127,7 @@ Each item now includes a `status` object:
 ```javascript
 // features/rundowns.js
 async function fetchRundownItems(inst, rundownId) {
-    const items = await inst.api.lino.listItems(engineId, rundownId);
+    const items = await inst.api.lino.listItems(showId, rundownId);
     // Store items...
 }
 ```
@@ -140,13 +140,13 @@ async function fetchRundownItems(inst, rundownId) {
 /**
  * Fetch rundown items with status information
  * @param {Object} inst - Module instance
- * @param {number} engineId - Show/Engine ID
+ * @param {number} showId - Show ID
  * @param {number} rundownId - Rundown ID
  * @returns {Promise<Array>} Items with status
  */
-async function fetchRundownItems(inst, engineId, rundownId) {
+async function fetchRundownItems(inst, showId, rundownId) {
     try {
-        const items = await inst.api.lino.listItems(engineId, rundownId);
+        const items = await inst.api.lino.listItems(showId, rundownId);
         
         // Log status information for debugging
         const itemsWithStatus = items.filter(item => item.status);
@@ -245,8 +245,8 @@ function startStatusPolling(inst, intervalMs = 5000) {
         try {
             // Refresh all loaded rundowns
             for (const rundownId in inst.data.rundownItems) {
-                const engineId = inst.config.engineId; // Get from config
-                await fetchRundownItems(inst, engineId, rundownId);
+                const showId = inst.config.showId; // Get from config
+                await fetchRundownItems(inst, showId, rundownId);
             }
             
             // Update all feedbacks after status refresh
@@ -485,8 +485,8 @@ module.exports = function(instance) {
                 
                 // Proceed with play
                 try {
-                    const engineId = instance.config.engineId;
-                    await instance.api.lino.play(engineId, itemId, preview);
+                    const showId = instance.config.showId;
+                    await instance.api.lino.play(showId, itemId, preview);
                     instance.log('info', `Played item ${itemId} to ${channel}`);
                     
                     // Refresh status after action
@@ -534,8 +534,8 @@ module.exports = function(instance) {
                 
                 // Proceed with out
                 try {
-                    const engineId = instance.config.engineId;
-                    await instance.api.lino.out(engineId, itemId, preview);
+                    const showId = instance.config.showId;
+                    await instance.api.lino.out(showId, itemId, preview);
                     instance.log('info', `Took out item ${itemId} from ${channel}`);
                     
                     // Refresh status after action
@@ -783,7 +783,7 @@ function isItemPlaying(inst, itemId, channel) {
 // Check if API supports status
 async function checkStatusSupport(inst) {
     try {
-        const items = await inst.api.lino.listItems(engineId, rundownId);
+        const items = await inst.api.lino.listItems(showId, rundownId);
         
         if (items.length > 0 && items[0].status) {
             inst.log('info', '✅ API supports item status');

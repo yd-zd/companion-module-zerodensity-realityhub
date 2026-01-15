@@ -11,18 +11,17 @@
 //
 // LOGICAL LAYER (Shows):
 //   GET /api/rest/v1/launcher - Returns shows with channels and attached engines
-//   GET /api/rest/v1/lino/engines - Returns "Lino Engines" (SAME as Shows!)
+//   GET /api/rest/v1/lino/shows - Returns Shows with loadedRundownsInfo
 //   IDs: 60, 92, 96...
 //   - Shows are logical groupings that ATTACH to Reality Engines
 //   - Rundowns are LOADED on Shows
 //   - Items in rundowns are assigned to Dynamic Channels
 //
-// CRITICAL API CONFUSION:
-//   - "Lino Engine" = Show (legacy naming)
-//   - All Lino API {engineId} parameters are actually SHOW IDs!
+// API NOTES:
+//   - All Lino API {showId} parameters require SHOW IDs from /lino/shows
 //   - Use inst.data.rundownToShowMap to get correct Show ID for API calls
 //
-// We fetch BOTH /launcher (rich data) and /lino/engines (loadedRundownsInfo) and merge them
+// We fetch BOTH /launcher (rich data) and /lino/shows (loadedRundownsInfo) and merge them
 
 import { getActions } from '../actions.js'
 import { getVariables } from '../variables.js'
@@ -80,7 +79,7 @@ export const showSelection = (inst, defaultOnly=false, runningOnly=true) => {
     const showChoices = []
     
     for (const [id, show] of Object.entries(inst.data.shows || {})) {
-        // Check both running (from /launcher) and started (from /lino/engines)
+        // Check both running (from /launcher) and started (from /lino/shows)
         const isActive = show.running || show.started
         // Skip non-running shows if runningOnly is true
         if (runningOnly && !isActive) continue
@@ -108,7 +107,7 @@ export const showSelectionMulti = (inst, defaultOnly=false, runningOnly=false) =
     const showChoices = []
     
     for (const [id, show] of Object.entries(inst.data.shows || {})) {
-        // Check both running (from /launcher) and started (from /lino/engines)
+        // Check both running (from /launcher) and started (from /lino/shows)
         const isActive = show.running || show.started
         if (runningOnly && !isActive) continue
         
@@ -194,7 +193,7 @@ export const loadEngines = async (inst) => {
                     graphChannels: r.graphChannels || [],
                     log: r.log || null
                 })),
-                // Will be populated from lino/engines
+                // Will be populated from lino/shows
                 loadedRundowns: []
             }
 
@@ -204,9 +203,9 @@ export const loadEngines = async (inst) => {
         }
     }
 
-    // ========== FETCH LINO ENGINES (for loadedRundownsInfo) ==========
-    // GET /api/rest/v1/lino/engines - Shows with loadedRundownsInfo
-    const linoEnginesData = await inst.GET('lino/engines', {}, 'medium')
+    // ========== FETCH LINO SHOWS (for loadedRundownsInfo) ==========
+    // GET /api/rest/v1/lino/shows - Shows with loadedRundownsInfo
+    const linoEnginesData = await inst.GET('lino/shows', {}, 'medium')
     
     if (linoEnginesData !== null && Array.isArray(linoEnginesData)) {
         for (const linoShow of linoEnginesData) {
