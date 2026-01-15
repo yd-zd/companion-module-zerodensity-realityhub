@@ -2,7 +2,7 @@
 
 import { combineRgb } from '@companion-module/base'
 import { nodePropertiesOptions } from './features/nodes.js'
-import { rundownButtonOptions } from './features/rundowns.js'
+import { rundownButtonOptions, getItemStatus, isItemPlaying, isItemActive, isItemOnline, getItemType } from './features/rundowns.js'
 import { templateButtonOptions } from './features/templates.js'
 import { contains, sString, basicFeedback, featureInactive, deepSetProperty } from './tools.js'
 import { engineSelection, engineSelectionSingle } from './features/engines.js'
@@ -570,6 +570,229 @@ function createFeedbacks(inst) {
                 // Return TRUE if show is INACTIVE (to apply the dim style)
                 const isActive = show.running || show.started
                 return !isActive
+            }
+        }
+        
+        // ============ ITEM STATUS FEEDBACKS (NEW) ============
+        // These feedbacks change button appearance based on item play status
+        // Use the new status API: { preview, program, isActive, activeIn }
+        
+        // Helper to create item selection dropdown
+        const createItemSelectionOptions = () => {
+            const options = [
+                {
+                    type: 'dropdown',
+                    label: 'Rundown:',
+                    id: 'rundown',
+                    default: Object.keys(inst.data.rundowns)[0] || '',
+                    choices: Object.entries(inst.data.rundowns).map(([rID, rd]) => {
+                        const showId = inst.data.rundownToShowMap?.[rID]
+                        const show = showId ? inst.data.shows?.[showId] : null
+                        const showName = show?.name || rd.showName || 'Unknown'
+                        return { id: rID, label: `${rd.name} (${showName})` }
+                    })
+                }
+            ]
+            
+            // Add item dropdowns for each rundown
+            for (const [rID, rd] of Object.entries(inst.data.rundowns)) {
+                if (rd.items) {
+                    options.push({
+                        type: 'dropdown',
+                        label: 'Item:',
+                        id: `item_${rID}`,
+                        default: Object.keys(rd.items)[0] || '',
+                        choices: Object.entries(rd.items).map(([iID, item]) => ({
+                            id: iID,
+                            label: `#${iID} ${item.name}`
+                        })),
+                        isVisibleData: { rundown: rID },
+                        isVisible: (options, data) => options.rundown === data.rundown
+                    })
+                }
+            }
+            
+            return options
+        }
+        
+        // Item Playing in Program - RED when on air
+        feedbacks.itemPlayingInProgram = {
+            type: 'boolean',
+            name: 'Item Status: Playing in Program (ON AIR)',
+            description: 'Changes button to RED when item is playing in PROGRAM channel. Use this to show which items are ON AIR.',
+            options: createItemSelectionOptions(),
+            defaultStyle: {
+                color: combineRgb(255, 255, 255),
+                bgcolor: combineRgb(220, 38, 38)  // Red
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return false
+                
+                return isItemPlaying(inst, rundownId, itemId, 'program')
+            }
+        }
+        
+        // Item Playing in Preview - GREEN when in preview
+        feedbacks.itemPlayingInPreview = {
+            type: 'boolean',
+            name: 'Item Status: Playing in Preview',
+            description: 'Changes button to GREEN when item is playing in PREVIEW channel.',
+            options: createItemSelectionOptions(),
+            defaultStyle: {
+                color: combineRgb(255, 255, 255),
+                bgcolor: combineRgb(34, 197, 94)  // Green
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return false
+                
+                return isItemPlaying(inst, rundownId, itemId, 'preview')
+            }
+        }
+        
+        // Item Is Active - YELLOW/GOLD when playing in any channel
+        feedbacks.itemIsActive = {
+            type: 'boolean',
+            name: 'Item Status: Active (Any Channel)',
+            description: 'Changes button to YELLOW when item is active in ANY channel (Program or Preview).',
+            options: createItemSelectionOptions(),
+            defaultStyle: {
+                color: combineRgb(0, 0, 0),
+                bgcolor: combineRgb(234, 179, 8)  // Yellow/Gold
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return false
+                
+                return isItemActive(inst, rundownId, itemId)
+            }
+        }
+        
+        // Advanced: Multi-state Status Indicator
+        // Priority: Program (red) > Preview (green) > Inactive (no change)
+        feedbacks.itemStatusIndicator = {
+            type: 'advanced',
+            name: 'Item Status: Indicator (Multi-State)',
+            description: 'Multi-state indicator: RED when in Program, GREEN when in Preview, default when inactive. Program takes priority over Preview.',
+            options: createItemSelectionOptions(),
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return {}
+                
+                const status = getItemStatus(inst, rundownId, itemId)
+                if (!status) return {}
+                
+                // Priority: Program > Preview > Inactive
+                if (status.program === 'Playing') {
+                    return {
+                        bgcolor: combineRgb(220, 38, 38),  // Red
+                        color: combineRgb(255, 255, 255)
+                    }
+                } else if (status.preview === 'Playing') {
+                    return {
+                        bgcolor: combineRgb(34, 197, 94),  // Green
+                        color: combineRgb(255, 255, 255)
+                    }
+                }
+                
+                return {}  // Inactive - use default style
+            }
+        }
+        
+        // Item Not Active - Desaturated appearance when item is idle
+        // This is the inverse of itemIsActive - applies when item is NOT playing
+        feedbacks.itemNotActive = {
+            type: 'boolean',
+            name: 'Item Status: Not Active (Desaturate)',
+            description: 'Desaturates button when item is NOT playing in any channel. Use this to show idle items.',
+            options: createItemSelectionOptions(),
+            defaultStyle: {
+                // Desaturated/dimmed appearance
+                color: combineRgb(160, 160, 160),
+                bgcolor: combineRgb(60, 60, 60)
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return false
+                
+                // Check if show is even active first
+                const showId = inst.data.rundownToShowMap?.[rundownId]
+                const show = showId ? inst.data.shows?.[showId] : null
+                const isShowActive = show?.running || show?.started
+                
+                // If show is not active, don't apply this feedback
+                // (showStatusInactive handles that case)
+                if (!isShowActive) return false
+                
+                // Return TRUE if item is NOT active (to apply the desaturated style)
+                return !isItemActive(inst, rundownId, itemId)
+            }
+        }
+        
+        // Item Offline - Shows when item is NOT online (not ready on Reality Engine)
+        // The item exists in rundown but isn't loaded/ready on the physical render engine
+        feedbacks.itemOffline = {
+            type: 'boolean',
+            name: 'Item Status: Offline (Not Ready on Engine)',
+            description: 'Shows warning when item is NOT ready on Reality Engine. Item exists in rundown but the engine hasn\'t loaded it yet (show stopped, engine disconnected, or still loading).',
+            options: createItemSelectionOptions(),
+            defaultStyle: {
+                // Warning appearance - orange/yellow tint with warning icon
+                color: combineRgb(50, 50, 50),
+                bgcolor: combineRgb(180, 100, 20)  // Orange warning
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return false
+                
+                // Return TRUE if item is OFFLINE (to apply the warning style)
+                return !isItemOnline(inst, rundownId, itemId)
+            }
+        }
+        
+        // Item Type Indicator - Shows different styles for VS vs MD items
+        feedbacks.itemTypeVS = {
+            type: 'boolean',
+            name: 'Item Type: Nodos/VS Item',
+            description: 'Activates when item is a Nodos/VS (Virtual Set) item. Use to add "VS" label or specific styling.',
+            options: createItemSelectionOptions(),
+            defaultStyle: {
+                // VS items get a subtle blue tint
+                color: combineRgb(255, 255, 255),
+                bgcolor: combineRgb(40, 80, 120)  // Blue tint for VS
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return false
+                
+                return getItemType(inst, rundownId, itemId) === 'vs'
+            }
+        }
+        
+        feedbacks.itemTypeMD = {
+            type: 'boolean',
+            name: 'Item Type: Motion Design Item',
+            description: 'Activates when item is a Motion Design item. Use to add "MD" label or specific styling.',
+            options: createItemSelectionOptions(),
+            defaultStyle: {
+                // MD items get a purple tint
+                color: combineRgb(255, 255, 255),
+                bgcolor: combineRgb(100, 40, 120)  // Purple tint for MD
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return false
+                
+                return getItemType(inst, rundownId, itemId) === 'md'
             }
         }
     }

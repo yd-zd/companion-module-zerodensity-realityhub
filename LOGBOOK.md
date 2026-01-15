@@ -1,5 +1,266 @@
 # RealityHub Companion Module - Development Logbook
 
+## 2026-01-06: Optimistic UI & Button Debounce (v2.1.13)
+
+### Features
+
+**1. Optimistic UI Updates**
+When pressing play/out buttons, the visual state updates **immediately** before the API response arrives. This gives instant feedback to users.
+
+- Button color/symbol changes instantly on press
+- API call happens in background
+- Real state is refreshed from API to confirm
+- If API fails, state reverts automatically
+
+**2. Button Debounce (Cooldown)**
+Prevents rapid repeated button presses that could cause issues.
+
+- 1.5 second cooldown between presses of same button
+- Button ignores presses during cooldown period
+- Applies to: Play, Out, and Toggle actions
+- Each item/channel combination has its own cooldown
+
+### Implementation Details
+
+```javascript
+// Cooldown tracker
+const buttonCooldowns = {}
+const COOLDOWN_MS = 1500 // 1.5 seconds
+
+// Optimistic update flow:
+1. User presses button
+2. Check cooldown → skip if in cooldown
+3. Mark button as pressed (start cooldown)
+4. Apply optimistic update → immediate visual change
+5. Send API request
+6. On success → refresh real state from API
+7. On failure → revert to previous state
+```
+
+### Files Changed
+- `actions.js` - Added debounce tracking and optimistic update logic
+
+---
+
+## RealityHub Architecture Reference
+
+Understanding this architecture is critical for working with the API:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     PHYSICAL LAYER                                  │
+├─────────────────────────────────────────────────────────────────────┤
+│  Reality Engines (GET /api/rest/v1/engines)                         │
+│  IDs: 41, 42, 44... (e.g., ENG128, ENG129)                          │
+│                                                                     │
+│    └── Each engine runs Nodos with a node graph                     │
+│          └── Dynamic Channels (outputs defined in graph)            │
+│                ├── Channel 0: PGM_OnAir (1920x1080)                 │
+│                └── Channel 1: PGM_Videowall (1920x1080)             │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              │ attached to
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                     LOGICAL LAYER                                   │
+├─────────────────────────────────────────────────────────────────────┤
+│  Shows (GET /api/rest/v1/launcher)                                  │
+│  IDs: 60, 92, 96... (e.g., "Main Show", "Studio B")                 │
+│                                                                     │
+│  ⚠️  "Lino Engines" (GET /lino/engines) = SAME AS SHOWS!            │
+│      All Lino API {engineId} parameters are actually SHOW IDs!      │
+│                                                                     │
+│    └── Rundowns (loaded on Shows)                                   │
+│          └── Items/Templates                                        │
+│                └── Assigned to Dynamic Channel (OnAir/Videowall)    │
+│                      └── Play to Preview (bus 1) or Program (bus 0) │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Concepts:**
+- **Dynamic Channel**: Physical output from Nodos graph (OnAir, Videowall) - WHERE it renders
+- **Preview/Program**: Broadcast bus like a video mixer - WHICH output bus it goes to
+- **status.online**: Item loaded on engine's dynamic channel (ready to play)
+
+---
+
+## 2026-01-06: Item Online Status & Type Display (API v2.1.0)
+
+### New Features: Online Status and Item Type
+
+**Status:** ✅ IMPLEMENTED - Version 2.1.11
+
+**Background:**
+RealityHub API v2.1.0 added two new fields to rundown items:
+- `status.online` - Boolean indicating if item is loaded and ready on engine
+- `itemType` - String ('vs' = Nodos/VS, 'md' = Motion Design)
+
+### Implementation
+
+**1. Item Online Status**
+- New helper function: `isItemOnline(inst, rundownId, itemId)`
+- New feedback: `itemOffline` - Orange warning when item not ready
+- Applied to ALL item buttons as highest-priority feedback
+- Shows users which items cannot be played
+
+**Note:** `status.online` indicates if item is loaded/ready on the **Reality Engine** (physical render machine). Item exists in rundown but engine hasn't loaded it yet (show stopped, engine disconnected, or still loading assets).
+
+**2. Item Type Display**
+- New helper function: `getItemType(inst, rundownId, itemId)`
+- New feedbacks: `itemTypeVS` and `itemTypeMD`
+- Item categories now show type label: `ItemName [VS]` or `ItemName [MD]`
+- Helps distinguish Nodos/Virtual Set items from Motion Design items
+
+### Feedback Priority (applied in order, last wins)
+1. Show stopped → gray (lowest)
+2. Item not active → desaturated
+3. Item playing → bright color
+4. **Item offline → orange warning (highest)**
+
+### Files Changed
+
+- `features/rundowns.js` - Store itemType, add isItemOnline/getItemType helpers
+- `feedbacks.js` - Add itemOffline, itemTypeVS, itemTypeMD feedbacks
+- `presets.js` - Add type labels to categories, add offline feedback to buttons
+
+---
+
+## 2026-01-06: Clear Output Action (API v2.1.0)
+
+### New Feature: Clear Output Channel
+
+**Status:** ✅ IMPLEMENTED - Version 2.1.11
+
+**Background:**
+RealityHub API v2.1.0 introduced a new endpoint to clear output channels with a single API call:
+
+```
+PUT /api/rest/v1/lino/rundown/{engineId}/clear/{preview}
+  preview: 0 = Clear Program, 1 = Clear Preview
+```
+
+**Benefits vs All Out:**
+- **Single API call** instead of looping through all items
+- **Faster execution** - no network overhead per item
+- **More reliable** - atomic operation
+
+### Implementation
+
+**New Action: `clearOutput`**
+- Uses the new `PUT /lino/rundown/{showId}/clear/{channel}` endpoint
+- Same options as `rundownAllOut` (rundown + channel selection)
+- Requires RealityHub 2.1.0+
+
+**New Presets:**
+- `🗑️ CLEAR PROGRAM` - Red-tinted button to clear Program channel
+- `🗑️ CLEAR PREVIEW` - Darker red button to clear Preview channel
+- Located in `🎬 Controls` category alongside ALL OUT buttons
+
+### Files Changed
+
+- `actions.js` - Added `clearOutput` action
+- `presets.js` - Added CLEAR presets in Controls category
+- `package.json` - Version 2.1.11
+- `companion/manifest.json` - Version 2.1.11
+
+---
+
+## 2026-01-05: Rundown Item Status API Enhancement (IMPLEMENTED)
+
+### New API Feature: Real-Time Item Status
+
+**Status:** ✅ IMPLEMENTED - Version 2.1.10
+
+**Background:**
+Reality Hub API has been enhanced with real-time status information for rundown items. The endpoint `GET /api/rest/v1/lino/rundown/{engineId}/{rundownId}/items` now returns runtime status for each item.
+
+**API Response Structure (v2.1.0+):**
+```json
+{
+  "id": 128,
+  "itemNo": 4,
+  "name": "News_LT_Logo",
+  "template": "News_LT_Logo",
+  "templateId": 5,
+  "buttons": {},
+  "data": {},
+  "status": {
+    "preview": "Available | Playing | Unavailable",
+    "program": "Available | Playing | Unavailable",
+    "isActive": true,
+    "activeIn": ["preview", "program"],
+    "online": true
+  }
+}
+```
+
+**Status Field Values:**
+- **Available**: Channel is ready, item can be played
+- **Playing**: Item is currently playing on this channel
+- **Unavailable**: Item cannot be played (not loaded or engine offline)
+
+### Implementation Summary
+
+**Files Modified:**
+1. `features/rundowns.js` - Store item status, add helper functions
+2. `feedbacks.js` - 5 new feedback types for status visualization
+3. `presets.js` - Status-aware button colors with layered feedbacks
+
+### New Feedback Types
+
+| Feedback | Description | Color |
+|----------|-------------|-------|
+| `itemPlayingInProgram` | Item is ON AIR in Program | 🔴 Bright Red |
+| `itemPlayingInPreview` | Item is in Preview | 🟢 Bright Green |
+| `itemIsActive` | Item playing in any channel | 🟡 Yellow/Gold |
+| `itemStatusIndicator` | Multi-state (PGM/PVW/inactive) | Auto |
+| `itemNotActive` | Item is idle (desaturate) | 🌑 Dimmed |
+
+### Helper Functions Added (`features/rundowns.js`)
+
+```javascript
+getItemStatus(inst, rundownId, itemId)    // Get raw status object
+isItemPlaying(inst, rundownId, itemId, channel)  // Check if playing
+isItemActive(inst, rundownId, itemId)     // Check if active in any channel
+isChannelAvailable(inst, rundownId, itemId, channel)  // Check availability
+```
+
+### Button Color States
+
+Presets now have 3-layer feedback system:
+
+1. **Show Stopped** → Full gray (lowest priority)
+2. **Item Not Active** → Desaturated original color (medium)
+3. **Item Playing** → Bright color (highest priority)
+
+```
+Example for Play → Program button:
+- Show stopped:  Gray (#323232)
+- Item idle:     Dark desaturated red (#2D1919)  
+- Item playing:  Bright red (#DC2626)
+```
+
+### API Response Stored
+
+Each item now caches:
+```javascript
+item.status = {
+    preview: "Available" | "Playing" | "Unavailable",
+    program: "Available" | "Playing" | "Unavailable",
+    isActive: boolean,
+    activeIn: ["preview"] | ["program"] | ["preview", "program"],
+    online: boolean
+}
+```
+
+### Backward Compatibility
+
+- ✅ Works without status field (older API versions)
+- ✅ Graceful degradation: assume not playing if no status
+- ✅ Status feedbacks return false when status unavailable
+
+---
+
 ## 2025-01-XX: Version 2.1.9 - Image Cycling Button Support (Planned)
 
 ### Planned Feature: Image Cycling Buttons

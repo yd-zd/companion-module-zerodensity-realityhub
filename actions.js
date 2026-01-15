@@ -1,12 +1,77 @@
 // actions
 
 import { nodeFunctionsOptions, nodePropertiesOptions } from './features/nodes.js'
-import { rundownButtonOptions, rundownItemOptions, rundownPlayNextOptions } from './features/rundowns.js'
+import { rundownButtonOptions, rundownItemOptions, rundownPlayNextOptions, refreshRundownItemStatus, isItemPlaying, getItemStatus } from './features/rundowns.js'
 import { templateButtonOptions } from './features/templates.js'
 import { sString, contains, deepSetProperty, featureInactive, convertToFunctionId, featureLogic } from './tools.js'
 import { engineSelection } from './features/engines.js'
 
+// ============ BUTTON DEBOUNCE & OPTIMISTIC UI ============
+// Prevents rapid repeated button presses and provides instant visual feedback
 
+// Cooldown tracker: { 'rundownId_itemId_channel': timestamp }
+const buttonCooldowns = {}
+const COOLDOWN_MS = 1500 // 1.5 second cooldown between presses
+
+/**
+ * Check if a button is in cooldown period
+ * @param {string} key - Unique button key (rundownId_itemId_channel)
+ * @returns {boolean} True if button is in cooldown
+ */
+const isInCooldown = (key) => {
+    const lastPress = buttonCooldowns[key]
+    if (!lastPress) return false
+    return (Date.now() - lastPress) < COOLDOWN_MS
+}
+
+/**
+ * Mark a button as pressed (start cooldown)
+ * @param {string} key - Unique button key
+ */
+const markButtonPressed = (key) => {
+    buttonCooldowns[key] = Date.now()
+}
+
+/**
+ * Apply optimistic UI update - immediately toggle visual state before API response
+ * @param {Object} inst - Module instance
+ * @param {string} rundownId - Rundown ID
+ * @param {string} itemId - Item ID
+ * @param {string} channelKey - 'preview' or 'program'
+ * @param {boolean} willBePlaying - Expected state after toggle
+ */
+const applyOptimisticUpdate = (inst, rundownId, itemId, channelKey, willBePlaying) => {
+    const rundown = inst.data.rundowns?.[rundownId]
+    if (!rundown?.items?.[itemId]) return
+    
+    const item = rundown.items[itemId]
+    if (!item.status) {
+        item.status = { preview: 'Available', program: 'Available', isActive: false, activeIn: [], online: true }
+    }
+    
+    // Update status optimistically
+    item.status[channelKey] = willBePlaying ? 'Playing' : 'Available'
+    item.status.isActive = item.status.preview === 'Playing' || item.status.program === 'Playing'
+    
+    // Update activeIn array
+    const activeIn = []
+    if (item.status.preview === 'Playing') activeIn.push('preview')
+    if (item.status.program === 'Playing') activeIn.push('program')
+    item.status.activeIn = activeIn
+    
+    // Trigger immediate visual update
+    inst.checkFeedbacks(
+        'itemPlayingInProgram',
+        'itemPlayingInPreview',
+        'itemIsActive',
+        'itemStatusIndicator',
+        'itemNotActive',
+        'itemOffline',
+        'itemTypeDisplay'
+    )
+    
+    inst.log('debug', `Optimistic update: Item ${itemId} ${channelKey}=${willBePlaying ? 'Playing' : 'Available'}`)
+}
 
 function createActions(inst) {
     // set default actions
@@ -782,7 +847,7 @@ function createActions(inst) {
         // Play Item: PUT /lino/rundown/{showId}/play/{itemId}/{preview}
         actions.rundownItemPlay = {
             name: 'Rundown: Play Item',
-            description: 'Play a rundown item to Program (PGM) or Preview (PVW)',
+            description: 'Play a rundown item to Program (PGM) or Preview (PVW). Has 1.5s cooldown.',
             options: rundownItemOptions(inst.data.rundowns, inst.data.rundownToShowMap, inst.data.shows),
             callback: async (event) => {
                 const parsed = parseRundownItemSelection(event)
@@ -791,15 +856,32 @@ function createActions(inst) {
                     return
                 }
                 
-                const { showId, itemId, show, rundown, channel } = parsed
+                const { rundownId, showId, itemId, show, channel } = parsed
                 const channelName = channel === '1' ? 'Preview' : 'Program'
-                const endpoint = `lino/rundown/${showId}/play/${itemId}/${channel}`
+                const channelKey = channel === '1' ? 'preview' : 'program'
                 
+                // Check cooldown
+                const cooldownKey = `${rundownId}_${itemId}_${channel}_play`
+                if (isInCooldown(cooldownKey)) {
+                    inst.log('debug', `Play button in cooldown, ignoring: ${cooldownKey}`)
+                    return
+                }
+                markButtonPressed(cooldownKey)
+                
+                // Optimistic UI: Immediately show as playing
+                applyOptimisticUpdate(inst, rundownId, itemId, channelKey, true)
+                
+                const endpoint = `lino/rundown/${showId}/play/${itemId}/${channel}`
                 inst.log('debug', `Playing item to ${channelName}: Show="${show?.name}", Item=${itemId}`)
                 
                 const response = await inst.PUT(endpoint)
                 if (response === null) {
                     inst.log('warn', `Play item may have failed for: ${endpoint}`)
+                    // Revert optimistic update on failure
+                    applyOptimisticUpdate(inst, rundownId, itemId, channelKey, false)
+                } else {
+                    // Refresh real status from API
+                    refreshRundownItemStatus(inst, showId, rundownId)
                 }
             }
         }
@@ -807,7 +889,7 @@ function createActions(inst) {
         // Out Item: PUT /lino/rundown/{showId}/out/{itemId}/{preview}
         actions.rundownItemOut = {
             name: 'Rundown: Out Item',
-            description: 'Take out a rundown item from Program (PGM) or Preview (PVW)',
+            description: 'Take out a rundown item from Program (PGM) or Preview (PVW). Has 1.5s cooldown.',
             options: rundownItemOptions(inst.data.rundowns, inst.data.rundownToShowMap, inst.data.shows),
             callback: async (event) => {
                 const parsed = parseRundownItemSelection(event)
@@ -816,15 +898,32 @@ function createActions(inst) {
                     return
                 }
                 
-                const { showId, itemId, show, channel } = parsed
+                const { rundownId, showId, itemId, show, channel } = parsed
                 const channelName = channel === '1' ? 'Preview' : 'Program'
-                const endpoint = `lino/rundown/${showId}/out/${itemId}/${channel}`
+                const channelKey = channel === '1' ? 'preview' : 'program'
                 
+                // Check cooldown
+                const cooldownKey = `${rundownId}_${itemId}_${channel}_out`
+                if (isInCooldown(cooldownKey)) {
+                    inst.log('debug', `Out button in cooldown, ignoring: ${cooldownKey}`)
+                    return
+                }
+                markButtonPressed(cooldownKey)
+                
+                // Optimistic UI: Immediately show as not playing
+                applyOptimisticUpdate(inst, rundownId, itemId, channelKey, false)
+                
+                const endpoint = `lino/rundown/${showId}/out/${itemId}/${channel}`
                 inst.log('debug', `Taking out item from ${channelName}: Show="${show?.name}", Item=${itemId}`)
                 
                 const response = await inst.PUT(endpoint)
                 if (response === null) {
                     inst.log('warn', `Out item may have failed for: ${endpoint}`)
+                    // Revert optimistic update on failure (was playing before)
+                    applyOptimisticUpdate(inst, rundownId, itemId, channelKey, true)
+                } else {
+                    // Refresh real status from API
+                    refreshRundownItemStatus(inst, showId, rundownId)
                 }
             }
         }
@@ -841,7 +940,7 @@ function createActions(inst) {
                     return
                 }
                 
-                const { showId, itemId, show, channel } = parsed
+                const { rundownId, showId, itemId, show, channel } = parsed
                 const channelName = channel === '1' ? 'Preview' : 'Program'
                 const endpoint = `lino/rundown/${showId}/continue/${itemId}/${channel}`
                 
@@ -850,6 +949,58 @@ function createActions(inst) {
                 const response = await inst.PUT(endpoint)
                 if (response === null) {
                     inst.log('warn', `Continue item may have failed for: ${endpoint}`)
+                } else {
+                    // Refresh status immediately after successful command
+                    refreshRundownItemStatus(inst, showId, rundownId)
+                }
+            }
+        }
+
+        // Toggle Item: Play if not playing, Out if playing (like RealityHub UI)
+        actions.rundownItemToggle = {
+            name: 'Rundown: Toggle Item (Play/Out)',
+            description: 'Toggle item state: Play if not playing, Out if already playing. Single button control like RealityHub UI. Has 1.5s cooldown to prevent rapid presses.',
+            options: rundownItemOptions(inst.data.rundowns, inst.data.rundownToShowMap, inst.data.shows),
+            callback: async (event) => {
+                const parsed = parseRundownItemSelection(event)
+                if (!parsed || !parsed.showId) {
+                    inst.log('error', 'Cannot toggle item: Invalid selection')
+                    return
+                }
+                
+                const { rundownId, showId, itemId, show, channel } = parsed
+                const channelName = channel === '1' ? 'Preview' : 'Program'
+                const channelKey = channel === '1' ? 'preview' : 'program'
+                
+                // Check cooldown - prevent rapid repeated presses
+                const cooldownKey = `${rundownId}_${itemId}_${channel}`
+                if (isInCooldown(cooldownKey)) {
+                    inst.log('debug', `Button in cooldown, ignoring press: ${cooldownKey}`)
+                    return
+                }
+                markButtonPressed(cooldownKey)
+                
+                // Check current play state
+                const isPlaying = isItemPlaying(inst, rundownId, itemId, channelKey)
+                const willBePlaying = !isPlaying
+                
+                // OPTIMISTIC UI: Immediately update visual state before API call
+                applyOptimisticUpdate(inst, rundownId, itemId, channelKey, willBePlaying)
+                
+                // Toggle: Out if playing, Play if not
+                const action = isPlaying ? 'out' : 'play'
+                const endpoint = `lino/rundown/${showId}/${action}/${itemId}/${channel}`
+                
+                inst.log('debug', `Toggle ${channelName}: ${action.toUpperCase()} item ${itemId} (was ${isPlaying ? 'playing' : 'not playing'})`)
+                
+                const response = await inst.PUT(endpoint)
+                if (response === null) {
+                    inst.log('warn', `Toggle item may have failed for: ${endpoint}`)
+                    // Revert optimistic update on failure
+                    applyOptimisticUpdate(inst, rundownId, itemId, channelKey, isPlaying)
+                } else {
+                    // Refresh real status from API to confirm state
+                    refreshRundownItemStatus(inst, showId, rundownId)
                 }
             }
         }
@@ -886,6 +1037,9 @@ function createActions(inst) {
                 const response = await inst.PUT(endpoint)
                 if (response === null) {
                     inst.log('warn', `Play next may have failed for: ${endpoint}`)
+                } else {
+                    // Refresh status immediately after successful command
+                    refreshRundownItemStatus(inst, showId, rundownId)
                 }
             }
         }
@@ -940,6 +1094,57 @@ function createActions(inst) {
                 }
                 
                 inst.log('info', `All Out ${channelName}: ${successCount} succeeded, ${failCount} failed`)
+                
+                // Refresh status after all items processed
+                if (successCount > 0) {
+                    refreshRundownItemStatus(inst, showId, rundownId)
+                }
+            }
+        }
+
+        // Clear Output: Clear entire output channel (new in API v2.1.0)
+        // This is more efficient than rundownAllOut as it's a single API call
+        actions.clearOutput = {
+            name: 'Rundown: Clear Output (API v2.1.0)',
+            description: 'Clear the entire output channel (Program or Preview) with a single API call. More efficient than "All Out" which loops through items. Requires RealityHub 2.1.0+.',
+            options: rundownPlayNextOptions(inst.data.rundowns, inst.data.rundownToShowMap, inst.data.shows),
+            callback: async (event) => {
+                // Get Show ID from rundown selection
+                const rundownSelection = event.options.rundown
+                if (!rundownSelection) {
+                    inst.log('error', 'Cannot clear output: No rundown selected')
+                    return
+                }
+                
+                const rundownId = rundownSelection.substring(1) // Remove 'r' prefix
+                const rundown = inst.data.rundowns[rundownId]
+                const showId = rundown?.showId || rundown?.linoEngineId
+                const channel = event.options.channel || '0'
+                const channelName = channel === '1' ? 'Preview' : 'Program'
+                
+                if (!showId) {
+                    inst.log('error', 'Cannot clear output: No Show ID for rundown')
+                    return
+                }
+                
+                inst.log('info', `Clear Output: Clearing ${channelName} channel for Show ${showId}`)
+                
+                // Use the new clear endpoint (API v2.1.0)
+                const endpoint = `lino/rundown/${showId}/clear/${channel}`
+                try {
+                    const response = await inst.PUT(endpoint)
+                    if (response !== null) {
+                        inst.log('info', `Clear Output: ${channelName} cleared successfully`)
+                        // Refresh status immediately after successful command
+                        refreshRundownItemStatus(inst, showId, rundownId)
+                    } else {
+                        inst.log('warn', `Clear Output: No response from API (may still have succeeded)`)
+                        // Try refresh anyway in case it succeeded
+                        refreshRundownItemStatus(inst, showId, rundownId)
+                    }
+                } catch (e) {
+                    inst.log('error', `Clear Output failed: ${e.message}`)
+                }
             }
         }
     }

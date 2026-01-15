@@ -1,6 +1,6 @@
 {
 	"name": "companion-module-zerodensity-realityhub",
-	"version": "2.1.9",
+	"version": "2.1.14",
 	"main": "index.js",
 	"type": "module",
 	"scripts": {
