@@ -28,7 +28,7 @@
 // - GET /lino/rundowns returns ALL rundowns (not filtered by show)
 // - We filter to only show rundowns that are loaded on running shows
 // - Use inst.data.rundownToShowMap to get the correct Show ID for API calls
-// - All Lino {engineId} parameters are actually SHOW IDs, not Reality Engine IDs!
+// - All Lino {showId} parameters require SHOW IDs, not Reality Engine IDs!
 //
 // ITEM STATUS (API v2.1.0+):
 // - status.preview / status.program: "Available" | "Playing" | "Unavailable"
@@ -198,7 +198,7 @@ export const rundownSelection = (inst, includeAll = false) => {
         const show = showId ? shows[showId] : null
         
         // Skip rundowns not loaded on any running show (unless includeAll)
-        // Check both running (from /launcher) and started (from /lino/engines)
+        // Check both running (from /launcher) and started (from /lino/shows)
         const isShowActive = show && (show.running || show.started)
         if (!includeAll && !isShowActive) continue
         
@@ -340,7 +340,7 @@ export const rundownButtonOptions = (rundowns, rundownToShowMap, shows) => {
         const show = showId && shows ? shows[showId] : null
         
         // Only include rundowns that are loaded on running shows
-        // Check both running (from /launcher) and started (from /lino/engines)
+        // Check both running (from /launcher) and started (from /lino/shows)
         const isShowActive = show && (show.running || show.started)
         if (!isShowActive) continue
         
@@ -499,9 +499,13 @@ export const loadRundowns = async (inst) => {
         const rundownKey = rundown.id
         const showInfo = rundownToShow[rundown.id] || { showId: targetShowIds[0], showName: 'Unknown' }
         const showId = showInfo.showId
+        const show = shows[showId]
+        
+        // Check if show is running (API requires running show for items endpoint)
+        const isShowRunning = show && (show.running || show.started)
         
         // Initialize rundown entry using name from API response
-        // We preserve existing items if update fails
+        // We preserve existing items if update fails or show is stopped
         const existingItems = rundowns[rundownKey]?.items || {}
         
         const newRundownEntry = {
@@ -509,10 +513,23 @@ export const loadRundowns = async (inst) => {
             showId: showId,
             showName: showInfo.showName,
             linoEngineId: showId,
-            items: existingItems // Start with existing items
+            items: existingItems, // Start with existing items
+            showStopped: !isShowRunning // Flag for UI feedback
         }
 
-        // Request items for this rundown using correct Show ID
+        // Skip API call if show is not running - preserve existing cached items
+        // This avoids 404 errors from the API when show is stopped
+        if (!isShowRunning) {
+            // Keep existing items but mark all as offline
+            for (const itemId of Object.keys(existingItems)) {
+                if (existingItems[itemId].status) {
+                    existingItems[itemId].status.online = false
+                }
+            }
+            return { key: rundownKey, data: newRundownEntry }
+        }
+
+        // Request items for this rundown using correct Show ID (only for RUNNING shows)
         const itemsData = await inst.GET(`lino/rundown/${showId}/${rundown.id}/items/`, {}, 'medium')
 
         if (itemsData !== null && Array.isArray(itemsData)) {

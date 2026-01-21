@@ -5,6 +5,7 @@ import { rundownButtonOptions, rundownItemOptions, rundownPlayNextOptions, refre
 import { templateButtonOptions } from './features/templates.js'
 import { sString, contains, deepSetProperty, featureInactive, convertToFunctionId, featureLogic } from './tools.js'
 import { engineSelection } from './features/engines.js'
+import { channelSelection } from './features/channels.js'
 
 // ============ BUTTON DEBOUNCE & OPTIMISTIC UI ============
 // Prevents rapid repeated button presses and provides instant visual feedback
@@ -43,22 +44,22 @@ const markButtonPressed = (key) => {
 const applyOptimisticUpdate = (inst, rundownId, itemId, channelKey, willBePlaying) => {
     const rundown = inst.data.rundowns?.[rundownId]
     if (!rundown?.items?.[itemId]) return
-    
+
     const item = rundown.items[itemId]
     if (!item.status) {
         item.status = { preview: 'Available', program: 'Available', isActive: false, activeIn: [], online: true }
     }
-    
+
     // Update status optimistically
     item.status[channelKey] = willBePlaying ? 'Playing' : 'Available'
     item.status.isActive = item.status.preview === 'Playing' || item.status.program === 'Playing'
-    
+
     // Update activeIn array
     const activeIn = []
     if (item.status.preview === 'Playing') activeIn.push('preview')
     if (item.status.program === 'Playing') activeIn.push('program')
     item.status.activeIn = activeIn
-    
+
     // Trigger immediate visual update
     inst.checkFeedbacks(
         'itemPlayingInProgram',
@@ -69,7 +70,7 @@ const applyOptimisticUpdate = (inst, rundownId, itemId, channelKey, willBePlayin
         'itemOffline',
         'itemTypeDisplay'
     )
-    
+
     inst.log('debug', `Optimistic update: Item ${itemId} ${channelKey}=${willBePlaying ? 'Playing' : 'Available'}`)
 }
 
@@ -110,7 +111,7 @@ function createActions(inst) {
                         if (response.success === true) {
                             // request property data of selected node to update feedbacks
                             let properties = await inst.GET(`engines/${engine}/nodes/${sString(event.options.node)}/properties`)
-                            
+
                             // loop over all properties in response to find transision duration
                             for (const property of properties) {
                                 if (property.PropertyPath.includes('DoTransition/Duration')) {
@@ -122,20 +123,20 @@ function createActions(inst) {
                                             {},
                                             'medium'
                                         )
-                                        
+
                                         // loop over all properties in response to find feedback relevant data
                                         for (const property of properties) {
                                             if (property.PropertyPath.includes('ProgramChannel')) {
                                                 deepSetProperty(
                                                     inst.data.nodes,
-                                                    [ engine, event.options.node, 'properties', property.PropertyPath ],
+                                                    [engine, event.options.node, 'properties', property.PropertyPath],
                                                     property.Value
                                                 )
                                             }
                                             else if (property.PropertyPath.includes('PreviewChannel')) {
                                                 deepSetProperty(
                                                     inst.data.nodes,
-                                                    [ engine, event.options.node, 'properties', property.PropertyPath ],
+                                                    [engine, event.options.node, 'properties', property.PropertyPath],
                                                     property.Value
                                                 )
                                             }
@@ -143,7 +144,7 @@ function createActions(inst) {
 
                                         // check feedbacks to update buttons
                                         inst.checkFeedbacks('basicMixerChannel', 'nodesCheckPropertyValue')
-                                    }, property.Value*1030)
+                                    }, property.Value * 1030)
                                     break
                                 }
                             }
@@ -151,7 +152,7 @@ function createActions(inst) {
                         // throw error if "success" !== true
                         else throw new Error('ResponseError')
                     }
-                    catch(error) {
+                    catch (error) {
                         inst.log('error', `Action execution failed! (action: ${event.actionId}, engine: ${engine})\n` + error)
                     }
                 })
@@ -192,12 +193,12 @@ function createActions(inst) {
 
                     // request new constant value
                     try {
-                        const response = await inst.PATCH(endpoint, { Value:  event.options.render })
+                        const response = await inst.PATCH(endpoint, { Value: event.options.render })
                         if (Object.keys(response).length === 0) throw new Error('ResponseError')
                         // deepSetProperty(inst.data.nodes, [engine, event.options.node, 'properties', response.PropertyPath], response.Value)
                         // inst.checkFeedbacks('basicDisplayConstantDataValue', 'basicCheckConstantDataValue', 'nodesCheckPropertyValue')
                     }
-                    catch(error) {
+                    catch (error) {
                         inst.log('error', `Action execution failed! (action: ${event.actionId}, engine: ${engine})\n` + error)
                     }
                 })
@@ -264,8 +265,8 @@ function createActions(inst) {
                 },
             ],
             callback: async (event) => {
-                    
-                switch(event.options.data) {
+
+                switch (event.options.data) {
                     case 'updateEnginesData':
                         if (inst.data.module.updateEnginesData === true) break
                         inst.pollEngines(inst)
@@ -276,13 +277,13 @@ function createActions(inst) {
                         break
                     case 'updateRundownsData':
                         if (inst.data.module.updateRundownsData === true) break
-                        else if (contains(inst.config.features, 'rundowns')) 
-                        inst.pollRundowns(inst)
+                        else if (contains(inst.config.features, 'rundowns'))
+                            inst.pollRundowns(inst)
                         break
                     case 'updateTemplatesData':
                         if (inst.data.module.updateTemplatesData === true) break
-                        else if (contains(inst.config.features, 'templates')) 
-                        inst.pollTemplates(inst)
+                        else if (contains(inst.config.features, 'templates'))
+                            inst.pollTemplates(inst)
                         break
                 }
             }
@@ -388,7 +389,7 @@ function createActions(inst) {
                 event.options.node = await inst.parseVariablesInString(event.options.node)
                 event.options.value = await inst.parseVariablesInString(event.options[event.options.type])
 
-                switch(event.options.type) {
+                switch (event.options.type) {
                     case 'boolean':
                     case 'booleanVar':
                         event.options.property = 'Default%2F%2FBoolean%2F0'
@@ -403,9 +404,9 @@ function createActions(inst) {
 
                     case 'integer':
                     case 'integerVar':
-                            event.options.property = 'Default%2F%2FInteger%2F0'
-                            event.options.value = parseInt(event.options.value)
-                            break
+                        event.options.property = 'Default%2F%2FInteger%2F0'
+                        event.options.value = parseInt(event.options.value)
+                        break
 
                     case 'string':
                         event.options.property = 'Default%2F%2FString%2F0'
@@ -426,12 +427,12 @@ function createActions(inst) {
 
                     // request new constant value
                     try {
-                        const response = await inst.PATCH(endpoint, { Value:  event.options.value })
+                        const response = await inst.PATCH(endpoint, { Value: event.options.value })
                         if (Object.keys(response).length === 0) throw new Error('ResponseError')
                         deepSetProperty(inst.data.nodes, [engine, event.options.node, 'properties', response.PropertyPath], response.Value)
                         inst.checkFeedbacks('basicDisplayConstantDataValue', 'basicCheckConstantDataValue', 'nodesCheckPropertyValue')
                     }
-                    catch(error) {
+                    catch (error) {
                         inst.log('error', `Action execution failed! (action: ${event.actionId}, engine: ${engine})\n` + error)
                     }
                 })
@@ -490,12 +491,12 @@ function createActions(inst) {
 
                     // request new file path
                     try {
-                        const response = await inst.PATCH(endpoint, { Value:  sString(event.options.directory + event.options.path) })
+                        const response = await inst.PATCH(endpoint, { Value: sString(event.options.directory + event.options.path) })
                         if (Object.keys(response).length === 0) throw new Error('ResponseError')
                         deepSetProperty(inst.data.nodes, [engine, event.options.node, 'properties', response.PropertyPath], response.Value)
                         inst.checkFeedbacks('basicFilePath', 'nodesCheckPropertyValue')
                     }
-                    catch(error) {
+                    catch (error) {
                         inst.log('error', `Action execution failed! (action: ${event.actionId}, engine: ${engine})\n` + error)
                     }
                 })
@@ -521,8 +522,8 @@ function createActions(inst) {
                     id: 'channel',
                     default: 'Channels%2F%2FPreviewChannel%2F0',
                     choices: [
-                        { id: 'Channels%2F%2FPreviewChannel%2F0', label: 'Preview'},
-                        { id: 'Channels%2F%2FProgramChannel%2F0', label: 'Program'}
+                        { id: 'Channels%2F%2FPreviewChannel%2F0', label: 'Preview' },
+                        { id: 'Channels%2F%2FProgramChannel%2F0', label: 'Program' }
                     ],
                     tooltip: 'Select "Preview" or "Program" as target for this action'
                 },
@@ -532,16 +533,16 @@ function createActions(inst) {
                     id: 'name',
                     default: 'Channel1',
                     choices: [
-                        { id: 'Channel1', label: 'Channel 1'},
-                        { id: 'Channel2', label: 'Channel 2'},
-                        { id: 'Channel3', label: 'Channel 3'},
-                        { id: 'Channel4', label: 'Channel 4'},
-                        { id: 'Channel5', label: 'Channel 5'},
-                        { id: 'Channel6', label: 'Channel 6'},
-                        { id: 'Channel7', label: 'Channel 7'},
-                        { id: 'Channel8', label: 'Channel 8'},
-                        { id: 'Channel9', label: 'Channel 9'},
-                        { id: 'Channel10', label: 'Channel 10'}
+                        { id: 'Channel1', label: 'Channel 1' },
+                        { id: 'Channel2', label: 'Channel 2' },
+                        { id: 'Channel3', label: 'Channel 3' },
+                        { id: 'Channel4', label: 'Channel 4' },
+                        { id: 'Channel5', label: 'Channel 5' },
+                        { id: 'Channel6', label: 'Channel 6' },
+                        { id: 'Channel7', label: 'Channel 7' },
+                        { id: 'Channel8', label: 'Channel 8' },
+                        { id: 'Channel9', label: 'Channel 9' },
+                        { id: 'Channel10', label: 'Channel 10' }
                     ],
                     tooltip: 'Select channel to set to selected target'
                 },
@@ -556,7 +557,7 @@ function createActions(inst) {
                 event.options.engines.forEach(async (engine) => {
                     // create endpoint
                     const endpoint = `engines/${engine}/nodes/${sString(event.options.node)}/properties/${event.options.channel}`
-                    
+
                     // request new mixer channel
                     try {
                         const response = await inst.PATCH(endpoint, { Value: event.options.name })
@@ -565,7 +566,7 @@ function createActions(inst) {
                         deepSetProperty(inst.data.nodes, [engine, event.options.node, 'properties', response.PropertyPath], response.Value)
                         inst.checkFeedbacks('basicMixerChannel', 'nodesCheckPropertyValue')
                     }
-                    catch(error) {
+                    catch (error) {
                         inst.log('error', `Action execution failed! (action: ${event.actionId}, engine: ${engine})\n` + error)
                     }
                 })
@@ -616,7 +617,7 @@ function createActions(inst) {
                         const response = await inst.POST(endpoint)
                         if ((response.success !== true)) throw new Error('ResponseError')
                     }
-                    catch(error) {
+                    catch (error) {
                         inst.log('error', `Action execution failed! (action: ${event.actionId}, engine: ${engine})\n` + error)
                     }
                 })
@@ -640,9 +641,9 @@ function createActions(inst) {
                     id: 'function',
                     default: 'Default%2F%2FPlay%2F0',
                     choices: [
-                        { id: 'Default%2F%2FPlay%2F0', label: 'Play'},
-                        { id: 'Default%2F%2FPause%2F0', label: 'Pause'},
-                        { id: 'Default%2F%2FRewind%2F0', label: 'Rewind'}
+                        { id: 'Default%2F%2FPlay%2F0', label: 'Play' },
+                        { id: 'Default%2F%2FPause%2F0', label: 'Pause' },
+                        { id: 'Default%2F%2FRewind%2F0', label: 'Rewind' }
                     ],
                     tooltip: 'Select playback function'
                 },
@@ -681,7 +682,7 @@ function createActions(inst) {
                         if (response2.PropertyPath !== 'Media//Loop/0' || response2.Value !== event.options.loop) throw new Error('PropertyError')
                         deepSetProperty(inst.data.nodes, [engine, event.options.node, 'properties', response2.PropertyPath], response2.Value)
                     }
-                    catch(error) {
+                    catch (error) {
                         inst.log('error', `Action execution failed! (action: ${event.actionId}, engine: ${engine})\n` + error)
                     }
                 })
@@ -715,7 +716,7 @@ function createActions(inst) {
 
     // set node actions if feature selected
     if (contains(inst.config.features, 'nodes') && Object.keys(inst.data.nodes).length > 0) {
-        
+
         actions.nodeSetPropertyValue = {
             name: 'Node: Set Property Value',
             description: 'Set any property of specified node for selected engines',
@@ -731,7 +732,7 @@ function createActions(inst) {
                     for (const [inputKey, data] of Object.entries(inst.data.module.inputNodeMappings)) {
                         if (data.nodes.includes(event.options.node) && data.properties.includes(event.options[event.options.node])) {
                             const bodyKeys = inputKey.split(',')
-    
+
                             if (bodyKeys.length === 1 && event.options[inputKey] !== undefined) {
                                 body.Value = sString(await inst.parseVariablesInString(event.options[inputKey]))
                             }
@@ -748,9 +749,9 @@ function createActions(inst) {
                         const response = await inst.PATCH(endpoint, body)
                         if (Object.keys(response).length === 0) throw new Error('ResponseError')
                         inst.data.nodes[engine][event.options.node].properties[response.PropertyPath] = response.Value
-                        inst.checkFeedbacks('nodesCheckPropertyValue', 'basicMixerChannel', 'basicMediaFilePath','basicDisplayConstantDataValue',  'basicCheckConstantDataValue')
+                        inst.checkFeedbacks('nodesCheckPropertyValue', 'basicMixerChannel', 'basicMediaFilePath', 'basicDisplayConstantDataValue', 'basicCheckConstantDataValue')
                     }
-                    catch(error) {
+                    catch (error) {
                         inst.log('error', `Action execution failed! (action: ${event.actionId}, engine: ${engine})\n` + error)
                     }
                 })
@@ -766,13 +767,13 @@ function createActions(inst) {
                 event.options.engines.forEach(async (engine) => {
                     // create endpoint
                     const endpoint = `engines/${engine}/nodes/${sString(event.options.node)}/functions/${sString(event.options[event.options.node])}`
-                    
+
                     try {
                         // request function trigger
                         const response = await inst.POST(endpoint)
                         if (response.success !== true) throw new Error('ResponseError')
                     }
-                    catch(error) {
+                    catch (error) {
                         inst.log('error', `Action execution failed! (action: ${event.actionId}, engine: ${engine})\n` + error)
                     }
                 })
@@ -793,31 +794,31 @@ function createActions(inst) {
                 const rID = parts[0]
                 const iID = parts[1]
                 const bID = parts.slice(2).join('_')
-                
+
                 // Get the Show ID associated with this rundown
                 const rundownId = rID.substring(1)
                 const rundown = inst.data.rundowns[rundownId]
-                
+
                 // Use showId (preferred) or fall back to linoEngineId (backward compat)
                 const showId = rundown?.showId || rundown?.linoEngineId
                 if (!rundown || !showId) {
                     inst.log('error', `Cannot trigger button: No Show ID for rundown ${rundownId}`)
                     return
                 }
-                
+
                 // Verify the show is still running (check both running and started)
                 const show = inst.data.shows?.[showId]
                 const isShowActive = show?.running || show?.started
                 if (!isShowActive) {
                     inst.log('warn', `Show "${show?.name || showId}" is not running. Button may not work.`)
                 }
-                
+
                 const itemId = iID.substring(1)
                 const buttonKey = bID.substring(1)
                 const endpoint = `lino/rundown/${showId}/${rundownId}/items/${itemId}/buttons/${sString(buttonKey)}`
-                
+
                 inst.log('debug', `Triggering button: Show="${show?.name}" (ID=${showId}), Rundown="${rundown.name}" (ID=${rundownId}), Item=${itemId}, Button=${buttonKey}`)
-                
+
                 // Lino API: POST /api/rest/v1/lino/rundown/{showId}/{rundownId}/items/{itemId}/buttons/{buttonKey}
                 const response = await inst.POST(endpoint)
                 if (response === null) {
@@ -831,16 +832,16 @@ function createActions(inst) {
             // Parse the item selection: "r{rundownId}_i{itemId}"
             const itemSelection = event.options[event.options.rundown]
             if (!itemSelection) return null
-            
+
             const parts = itemSelection.split('_')
             const rundownId = parts[0].substring(1) // Remove 'r' prefix
             const itemId = parts[1].substring(1) // Remove 'i' prefix
-            
+
             const rundown = inst.data.rundowns[rundownId]
             const showId = rundown?.showId || rundown?.linoEngineId
             const show = inst.data.shows?.[showId]
             const channel = event.options.channel || '0'
-            
+
             return { rundownId, itemId, showId, show, rundown, channel }
         }
 
@@ -855,11 +856,11 @@ function createActions(inst) {
                     inst.log('error', 'Cannot play item: Invalid selection')
                     return
                 }
-                
+
                 const { rundownId, showId, itemId, show, channel } = parsed
                 const channelName = channel === '1' ? 'Preview' : 'Program'
                 const channelKey = channel === '1' ? 'preview' : 'program'
-                
+
                 // Check cooldown
                 const cooldownKey = `${rundownId}_${itemId}_${channel}_play`
                 if (isInCooldown(cooldownKey)) {
@@ -867,13 +868,13 @@ function createActions(inst) {
                     return
                 }
                 markButtonPressed(cooldownKey)
-                
+
                 // Optimistic UI: Immediately show as playing
                 applyOptimisticUpdate(inst, rundownId, itemId, channelKey, true)
-                
+
                 const endpoint = `lino/rundown/${showId}/play/${itemId}/${channel}`
                 inst.log('debug', `Playing item to ${channelName}: Show="${show?.name}", Item=${itemId}`)
-                
+
                 const response = await inst.PUT(endpoint)
                 if (response === null) {
                     inst.log('warn', `Play item may have failed for: ${endpoint}`)
@@ -897,11 +898,11 @@ function createActions(inst) {
                     inst.log('error', 'Cannot out item: Invalid selection')
                     return
                 }
-                
+
                 const { rundownId, showId, itemId, show, channel } = parsed
                 const channelName = channel === '1' ? 'Preview' : 'Program'
                 const channelKey = channel === '1' ? 'preview' : 'program'
-                
+
                 // Check cooldown
                 const cooldownKey = `${rundownId}_${itemId}_${channel}_out`
                 if (isInCooldown(cooldownKey)) {
@@ -909,13 +910,13 @@ function createActions(inst) {
                     return
                 }
                 markButtonPressed(cooldownKey)
-                
+
                 // Optimistic UI: Immediately show as not playing
                 applyOptimisticUpdate(inst, rundownId, itemId, channelKey, false)
-                
+
                 const endpoint = `lino/rundown/${showId}/out/${itemId}/${channel}`
                 inst.log('debug', `Taking out item from ${channelName}: Show="${show?.name}", Item=${itemId}`)
-                
+
                 const response = await inst.PUT(endpoint)
                 if (response === null) {
                     inst.log('warn', `Out item may have failed for: ${endpoint}`)
@@ -939,13 +940,13 @@ function createActions(inst) {
                     inst.log('error', 'Cannot continue item: Invalid selection')
                     return
                 }
-                
+
                 const { rundownId, showId, itemId, show, channel } = parsed
                 const channelName = channel === '1' ? 'Preview' : 'Program'
                 const endpoint = `lino/rundown/${showId}/continue/${itemId}/${channel}`
-                
+
                 inst.log('debug', `Continuing item on ${channelName}: Show="${show?.name}", Item=${itemId}`)
-                
+
                 const response = await inst.PUT(endpoint)
                 if (response === null) {
                     inst.log('warn', `Continue item may have failed for: ${endpoint}`)
@@ -967,11 +968,11 @@ function createActions(inst) {
                     inst.log('error', 'Cannot toggle item: Invalid selection')
                     return
                 }
-                
+
                 const { rundownId, showId, itemId, show, channel } = parsed
                 const channelName = channel === '1' ? 'Preview' : 'Program'
                 const channelKey = channel === '1' ? 'preview' : 'program'
-                
+
                 // Check cooldown - prevent rapid repeated presses
                 const cooldownKey = `${rundownId}_${itemId}_${channel}`
                 if (isInCooldown(cooldownKey)) {
@@ -979,20 +980,20 @@ function createActions(inst) {
                     return
                 }
                 markButtonPressed(cooldownKey)
-                
+
                 // Check current play state
                 const isPlaying = isItemPlaying(inst, rundownId, itemId, channelKey)
                 const willBePlaying = !isPlaying
-                
+
                 // OPTIMISTIC UI: Immediately update visual state before API call
                 applyOptimisticUpdate(inst, rundownId, itemId, channelKey, willBePlaying)
-                
+
                 // Toggle: Out if playing, Play if not
                 const action = isPlaying ? 'out' : 'play'
                 const endpoint = `lino/rundown/${showId}/${action}/${itemId}/${channel}`
-                
+
                 inst.log('debug', `Toggle ${channelName}: ${action.toUpperCase()} item ${itemId} (was ${isPlaying ? 'playing' : 'not playing'})`)
-                
+
                 const response = await inst.PUT(endpoint)
                 if (response === null) {
                     inst.log('warn', `Toggle item may have failed for: ${endpoint}`)
@@ -1017,23 +1018,23 @@ function createActions(inst) {
                     inst.log('error', 'Cannot play next: No rundown selected')
                     return
                 }
-                
+
                 const rundownId = rundownSelection.substring(1) // Remove 'r' prefix
                 const rundown = inst.data.rundowns[rundownId]
                 const showId = rundown?.showId || rundown?.linoEngineId
                 const show = inst.data.shows?.[showId]
                 const channel = event.options.channel || '0'
                 const channelName = channel === '1' ? 'Preview' : 'Program'
-                
+
                 if (!showId) {
                     inst.log('error', 'Cannot play next: No Show ID for rundown')
                     return
                 }
-                
+
                 const endpoint = `lino/rundown/${showId}/playnext/${channel}`
-                
+
                 inst.log('debug', `Playing next item to ${channelName}: Show="${show?.name}"`)
-                
+
                 const response = await inst.PUT(endpoint)
                 if (response === null) {
                     inst.log('warn', `Play next may have failed for: ${endpoint}`)
@@ -1056,26 +1057,26 @@ function createActions(inst) {
                     inst.log('error', 'Cannot all-out: No rundown selected')
                     return
                 }
-                
+
                 const rundownId = rundownSelection.substring(1) // Remove 'r' prefix
                 const rundown = inst.data.rundowns[rundownId]
                 const showId = rundown?.showId || rundown?.linoEngineId
                 const show = inst.data.shows?.[showId]
                 const channel = event.options.channel || '0'
                 const channelName = channel === '1' ? 'Preview' : 'Program'
-                
+
                 if (!showId) {
                     inst.log('error', 'Cannot all-out: No Show ID for rundown')
                     return
                 }
-                
+
                 if (!rundown?.items || Object.keys(rundown.items).length === 0) {
                     inst.log('warn', 'No items in rundown to out')
                     return
                 }
-                
+
                 inst.log('info', `All Out ${channelName}: Stopping all ${Object.keys(rundown.items).length} items in "${rundown.name}"`)
-                
+
                 // Call out for each item in the rundown
                 let successCount = 0
                 let failCount = 0
@@ -1092,9 +1093,9 @@ function createActions(inst) {
                         failCount++
                     }
                 }
-                
+
                 inst.log('info', `All Out ${channelName}: ${successCount} succeeded, ${failCount} failed`)
-                
+
                 // Refresh status after all items processed
                 if (successCount > 0) {
                     refreshRundownItemStatus(inst, showId, rundownId)
@@ -1115,20 +1116,20 @@ function createActions(inst) {
                     inst.log('error', 'Cannot clear output: No rundown selected')
                     return
                 }
-                
+
                 const rundownId = rundownSelection.substring(1) // Remove 'r' prefix
                 const rundown = inst.data.rundowns[rundownId]
                 const showId = rundown?.showId || rundown?.linoEngineId
                 const channel = event.options.channel || '0'
                 const channelName = channel === '1' ? 'Preview' : 'Program'
-                
+
                 if (!showId) {
                     inst.log('error', 'Cannot clear output: No Show ID for rundown')
                     return
                 }
-                
+
                 inst.log('info', `Clear Output: Clearing ${channelName} channel for Show ${showId}`)
-                
+
                 // Use the new clear endpoint (API v2.1.0)
                 const endpoint = `lino/rundown/${showId}/clear/${channel}`
                 try {
@@ -1161,7 +1162,7 @@ function createActions(inst) {
                 const rID = parts[0]
                 const iID = parts[1]
                 const bID = parts.slice(2).join('_')
-                
+
                 // Get the Lino engine ID associated with this template's rundown
                 const rundownId = rID.substring(1)
                 const template = inst.data.templates[rundownId]
@@ -1170,13 +1171,13 @@ function createActions(inst) {
                     inst.log('error', `Cannot trigger button: No Lino engine ID for template rundown ${rundownId}`)
                     return
                 }
-                
+
                 const itemId = iID.substring(1)
                 const buttonKey = bID.substring(1)
                 const endpoint = `lino/rundown/${linoEngineId}/${rundownId}/items/${itemId}/buttons/${sString(buttonKey)}`
-                
+
                 inst.log('debug', `Triggering template button: Show ID=${linoEngineId}, Rundown=${rundownId}, Item=${itemId}, Button=${buttonKey}`)
-                
+
                 // Lino API: POST /api/rest/v1/lino/rundown/{engineId}/{rundownId}/items/{itemId}/buttons/{buttonKey}
                 const response = await inst.POST(endpoint)
                 if (response === null) {
@@ -1194,7 +1195,7 @@ function createActions(inst) {
             id: showId,
             label: `${show.name} ${show.running || show.started ? '🟢' : '⚪'}`
         }))
-        
+
         const showSelectionOption = {
             type: 'dropdown',
             label: 'Show:',
@@ -1203,7 +1204,7 @@ function createActions(inst) {
             choices: showChoices,
             tooltip: 'Select the show to control'
         }
-        
+
         // Start Show action
         actions.launchShow = {
             name: 'Launcher: Start Show',
@@ -1215,18 +1216,18 @@ function createActions(inst) {
                     inst.log('error', 'No show selected')
                     return
                 }
-                
+
                 const show = inst.data.shows?.[showId]
                 const showName = show?.name || showId
-                
+
                 // Check if already running
                 if (show?.running || show?.started) {
                     inst.log('warn', `Show "${showName}" is already running`)
                     return
                 }
-                
+
                 inst.log('info', `Starting show: ${showName}`)
-                
+
                 // PUT /api/rest/v1/launcher/{showId}/launch
                 const endpoint = `launcher/${showId}/launch`
                 try {
@@ -1241,7 +1242,7 @@ function createActions(inst) {
                 }
             }
         }
-        
+
         // Stop Show action - Double-tap confirmation for safety
         // First tap: ARM (button turns red with "TAP AGAIN!")
         // Second tap within 3s: EXECUTE stop
@@ -1253,12 +1254,12 @@ function createActions(inst) {
             callback: async (event) => {
                 const showId = event.options.showId
                 inst.log('info', `stopShow action triggered for showId: ${showId}`)
-                
+
                 if (!showId) {
                     inst.log('error', 'No show selected')
                     return
                 }
-                
+
                 // Try both string and number lookups (API might return different types)
                 let show = inst.data.shows?.[showId]
                 if (!show && typeof showId === 'string') {
@@ -1267,40 +1268,40 @@ function createActions(inst) {
                 if (!show && typeof showId === 'number') {
                     show = inst.data.shows?.[String(showId)]
                 }
-                
+
                 // If show not found in cache, still allow the stop command
                 // (The show might exist but our cache is stale)
                 if (!show) {
                     inst.log('warn', `Show ${showId} not found in cache - proceeding with stop anyway`)
                 }
-                
+
                 const showName = show?.name || `Show ${showId}`
                 inst.log('debug', `Show status - running: ${show?.running}, started: ${show?.started}`)
-                
+
                 // Only skip if we KNOW the show is stopped (have data AND not running)
                 if (show && !show.running && !show.started) {
                     inst.log('warn', `Show "${showName}" is already stopped`)
                     return
                 }
-                
+
                 // Initialize armed state storage if needed
                 if (!inst.data.stopArmed) {
                     inst.data.stopArmed = {}
                 }
-                
+
                 const now = Date.now()
                 const armedTime = inst.data.stopArmed[showId]
                 const CONFIRM_TIMEOUT = 3000  // 3 seconds to confirm
-                
+
                 // Check if armed and within timeout
                 if (armedTime && (now - armedTime) < CONFIRM_TIMEOUT) {
                     // ARMED and within timeout - EXECUTE STOP!
                     inst.log('warn', `⚠️ CONFIRMED - STOPPING show: ${showName}`)
-                    
+
                     // Clear armed state
                     delete inst.data.stopArmed[showId]
                     inst.checkFeedbacks('stopShowArmed')
-                    
+
                     // PUT /api/rest/v1/launcher/{showId}/stop
                     const endpoint = `launcher/${showId}/stop`
                     inst.log('info', `Calling API: PUT ${endpoint}`)
@@ -1324,7 +1325,7 @@ function createActions(inst) {
                     inst.data.stopArmed[showId] = now
                     inst.log('warn', `🔴 ARMED to stop "${showName}" - TAP AGAIN within 3s to confirm!`)
                     inst.checkFeedbacks('stopShowArmed')
-                    
+
                     // Auto-disarm after timeout
                     setTimeout(() => {
                         if (inst.data.stopArmed?.[showId] === now) {

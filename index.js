@@ -87,12 +87,12 @@ class RealityHubInstance extends InstanceBase {
 				updateNodesData: false,
 				updateNodesDuration: 0,
 				updateNodesProgress: 0,
-				
+
 				// Cache Timestamps
 				lastRundownUpdate: 0,
 				lastNodesUpdate: 0,
 				lastTemplatesUpdate: 0,
-				
+
 				inputNodeMappings: {},
 				feedbackRequestActive: {},
 			},
@@ -161,13 +161,13 @@ class RealityHubInstance extends InstanceBase {
 
 				// run "configUpdated()" to try new connection
 				this.configUpdated(this.config, true)
-			}, retryDelay*1000)
+			}, retryDelay * 1000)
 			return
 		}
 
 		// start variable updater
 		this.executors.variables.start(100)
-		
+
 		this.log('info', 'Connection succeeded!')
 		this.connectionEstablished = true
 		this.outputErrors = true
@@ -223,8 +223,8 @@ class RealityHubInstance extends InstanceBase {
 			this.log('info', 'Load templates data...')
 			await this.pollTemplates(this) // request templates data
 			const templateValues = Object.values(this.data.templates)
-			const templateCount = templateValues.length > 0 && templateValues[0]?.items 
-				? Object.keys(templateValues[0].items).length 
+			const templateCount = templateValues.length > 0 && templateValues[0]?.items
+				? Object.keys(templateValues[0].items).length
 				: 0
 			this.log('info', `${templateCount} templates found!`)
 		}
@@ -253,12 +253,12 @@ class RealityHubInstance extends InstanceBase {
 		// This will trigger other updates (rundowns, nodes, etc.) sequentially
 		const interval = (this.config?.interval || 10) * 1000
 		this.data.timer.updateEngines.start(interval)
-		
+
 		this.log('debug', `Auto updater started with interval of ${interval}ms`)
 	}
 
 	// handle errors (non-blocking)
-	async errorModule(error='unknown error', subject='unknown subject') {
+	async errorModule(error = 'unknown error', subject = 'unknown subject') {
 		if (this.requestErrorThreshold > this.requestErrors) return
 
 		// log new errors
@@ -289,7 +289,7 @@ class RealityHubInstance extends InstanceBase {
 	}
 
 	// update config and try to connect to init module (non-blocking)
-	async configUpdated(config, retry=false) {
+	async configUpdated(config, retry = false) {
 		// Safety check: ensure config object exists
 		if (!config) {
 			this.updateStatus('bad_config', 'No configuration provided')
@@ -338,17 +338,17 @@ class RealityHubInstance extends InstanceBase {
 		this.executors.requests.unblock()
 
 		// reconnect, if host, protocol or port changed
-		const connectionChanged = this.config.host !== config.host || 
-			this.config.protocol !== config.protocol || 
+		const connectionChanged = this.config.host !== config.host ||
+			this.config.protocol !== config.protocol ||
 			this.config.port !== config.port
-		if (connectionChanged || retry === true || featuresChanged === true ) {
+		if (connectionChanged || retry === true || featuresChanged === true) {
 			// update config variable
 			this.config = config
 			this.errors.last = {}
 
 			this.updateStatus('connecting')
 			this.log('info', `Connecting to ${this.getBaseUrl()}...`)
-		
+
 			this.enableRequests = true
 			this.moduleInitiated = false
 			// Non-blocking connection attempt
@@ -361,7 +361,7 @@ class RealityHubInstance extends InstanceBase {
 		else if (this.connectionEstablished) {
 			// update config variable
 			this.config = config
-		
+
 			this.enableRequests = true
 			this.initModule(true).catch(err => {
 				this.log('error', `Re-init error: ${err.message}`)
@@ -411,56 +411,56 @@ class RealityHubInstance extends InstanceBase {
 
 		try {
 			// Handle requests based on method
-            // Note: POST/PUT/DELETE often return 204 No Content or empty bodies
-            // We gracefully handle ParseError for these command methods
+			// Note: POST/PUT/DELETE often return 204 No Content or empty bodies
+			// We gracefully handle ParseError for these command methods
 			if (method === 'GET') {
-                response = await got.get(url, parameters).json()
-            }
+				response = await got.get(url, parameters).json()
+			}
 			else if (method === 'POST') {
-                // POST (button triggers, function calls) may return empty body
-                try {
-                    response = await got.post(url, parameters).json()
-                } catch (jsonError) {
-                    if (jsonError.name === 'ParseError') {
-                        // Empty body is OK for command endpoints - treat as success
-                        response = { success: true }
-                    } else {
-                        throw jsonError
-                    }
-                }
-            }
+				// POST (button triggers, function calls) may return empty body
+				try {
+					response = await got.post(url, parameters).json()
+				} catch (jsonError) {
+					if (jsonError.name === 'ParseError') {
+						// Empty body is OK for command endpoints - treat as success
+						response = { success: true }
+					} else {
+						throw jsonError
+					}
+				}
+			}
 			else if (method === 'PATCH') {
-                response = await got.patch(url, parameters).json()
-            }
+				response = await got.patch(url, parameters).json()
+			}
 			else if (method === 'PUT') {
-                // PUT (play/out/continue commands) may return empty body
-                try {
-                    response = await got.put(url, parameters).json()
-                } catch (jsonError) {
-                    if (jsonError.name === 'ParseError') {
-                        // Empty body is OK for command endpoints - treat as success
-                        response = { success: true }
-                    } else {
-                        throw jsonError
-                    }
-                }
-            }
+				// PUT (play/out/continue commands) may return empty body
+				try {
+					response = await got.put(url, parameters).json()
+				} catch (jsonError) {
+					if (jsonError.name === 'ParseError') {
+						// Empty body is OK for command endpoints - treat as success
+						response = { success: true }
+					} else {
+						throw jsonError
+					}
+				}
+			}
 			else if (method === 'DELETE') {
-                // DELETE may also return empty body
-                try {
-                    response = await got.delete(url, parameters).json()
-                } catch (jsonError) {
-                    if (jsonError.name === 'ParseError') {
-                        response = { success: true }
-                    } else {
-                        throw jsonError
-                    }
-                }
-            }
+				// DELETE may also return empty body
+				try {
+					response = await got.delete(url, parameters).json()
+				} catch (jsonError) {
+					if (jsonError.name === 'ParseError') {
+						response = { success: true }
+					} else {
+						throw jsonError
+					}
+				}
+			}
 
 			this.requestErrors = 0
 		}
-		catch(error) {
+		catch (error) {
 			this.requestErrors++
 			// Enhanced error handling for API key issues
 			if (error.response?.statusCode === 401) {
@@ -476,8 +476,8 @@ class RealityHubInstance extends InstanceBase {
 		finally {
 			// log request debug message if enabled
 			if (this.config.debugRequests === true) {
-                this.log('debug', `${method} request "${url}"`)
-            }
+				this.log('debug', `${method} request "${url}"`)
+			}
 
 			// return null if requests are not allowed
 			if (this.enableRequests !== true) return null
@@ -494,21 +494,21 @@ class RealityHubInstance extends InstanceBase {
 		// Ensure port is a valid integer between 1-65535
 		let port = Math.floor(Number(this.config.port)) || 80
 		port = Math.max(1, Math.min(65535, port))
-		
+
 		// Include port in URL only if it's not the default for the protocol
 		const includePort = !(
-			(protocol === 'http' && port === 80) || 
+			(protocol === 'http' && port === 80) ||
 			(protocol === 'https' && port === 443)
 		)
-		
+
 		return `${protocol}://${host}${includePort ? ':' + port : ''}/api/rest/v1`
 	}
 
-	GET = async (endpoint, body={}, importance='high') => this.REQ('GET', `${this.getBaseUrl()}/${endpoint}`, body, importance)
-	POST = async (endpoint, body={}, importance='high') => this.REQ('POST', `${this.getBaseUrl()}/${endpoint}`, body, importance)
-	PATCH = async (endpoint, body={}, importance='high') => this.REQ('PATCH', `${this.getBaseUrl()}/${endpoint}`, body, importance)
-	PUT = async (endpoint, body={}, importance='high') => this.REQ('PUT', `${this.getBaseUrl()}/${endpoint}`, body, importance)
-	DELETE = async (endpoint, body={}, importance='high') => this.REQ('DELETE', `${this.getBaseUrl()}/${endpoint}`, body, importance)
+	GET = async (endpoint, body = {}, importance = 'high') => this.REQ('GET', `${this.getBaseUrl()}/${endpoint}`, body, importance)
+	POST = async (endpoint, body = {}, importance = 'high') => this.REQ('POST', `${this.getBaseUrl()}/${endpoint}`, body, importance)
+	PATCH = async (endpoint, body = {}, importance = 'high') => this.REQ('PATCH', `${this.getBaseUrl()}/${endpoint}`, body, importance)
+	PUT = async (endpoint, body = {}, importance = 'high') => this.REQ('PUT', `${this.getBaseUrl()}/${endpoint}`, body, importance)
+	DELETE = async (endpoint, body = {}, importance = 'high') => this.REQ('DELETE', `${this.getBaseUrl()}/${endpoint}`, body, importance)
 }
 
 runEntrypoint(RealityHubInstance, upgradeScripts)
