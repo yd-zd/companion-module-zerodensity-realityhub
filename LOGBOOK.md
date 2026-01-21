@@ -1299,3 +1299,21 @@ Created dynamic presets from rundown item buttons:
 The "Rundown-Name For Templates" config field now supports:
 - Specific rundown name (e.g., "CompanionTemplatesPool") for legacy behavior
 - Empty or "*" to disable template pool sync and only use the new Rundowns feature
+
+## 2026-01-21: Verification & Version Bump (v2.1.16)
+
+### Verification of RealityHub API v2.1.0 support
+Verified the codebase against `rhub-mcp-server` documentation and confirmed support for key features:
+
+**Confirmed Implemented:**
+- ✅ **API Key Authentication**: `X-API-Key` header support present in `index.js`
+- ✅ **Item Status**: Real-time status fields (preview/program/online) and visual feedbacks in `features/rundowns.js`
+- ✅ **Clear Output Endpoints**: `clearOutput` action uses correct API endpoints
+- ✅ **Button Triggers**: `rundownButtonPress` action uses the new `POST .../buttons/...` endpoint
+
+**Deferred:**
+- ⏩ **Dynamic Channel Discovery**: Channel lists currently rely on hardcoded "Channel 1-10" values. Dynamic discovery from `/launcher/shows/.../channels` endpoints is postponed.
+
+### Files Changed
+- `package.json` - Bumped to 2.1.16
+- `companion/manifest.json` - Bumped to 2.1.16 (synced from 2.1.14)

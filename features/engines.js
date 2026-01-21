@@ -30,7 +30,7 @@ import { ms2S, isEqual, contains, shouldUpdate } from '../tools.js'
 
 
 // Creating multidropdown with all available Reality Engines
-export const engineSelection = (inst, defaultOnly=false) => {
+export const engineSelection = (inst, defaultOnly = false) => {
     const defaultEngines = []
     const engineChoices = []
     const engines = inst.data?.engines || {}
@@ -52,7 +52,7 @@ export const engineSelection = (inst, defaultOnly=false) => {
 }
 
 // Creating normal dropdown with all available Reality Engines
-export const engineSelectionSingle = (inst, defaultOnly=false) => {
+export const engineSelectionSingle = (inst, defaultOnly = false) => {
     let defaultEngine = undefined
     const engineChoices = []
     const engines = inst.data?.engines || {}
@@ -74,16 +74,16 @@ export const engineSelectionSingle = (inst, defaultOnly=false) => {
 }
 
 // Creating dropdown with all available Shows (for rundown operations)
-export const showSelection = (inst, defaultOnly=false, runningOnly=true) => {
+export const showSelection = (inst, defaultOnly = false, runningOnly = true) => {
     let defaultShow = undefined
     const showChoices = []
-    
+
     for (const [id, show] of Object.entries(inst.data.shows || {})) {
         // Check both running (from /launcher) and started (from /lino/shows)
         const isActive = show.running || show.started
         // Skip non-running shows if runningOnly is true
         if (runningOnly && !isActive) continue
-        
+
         if (defaultShow === undefined) defaultShow = id
         const status = isActive ? '🟢' : '⚪'
         showChoices.push({ id: id, label: `${status} ${show.name}` })
@@ -102,15 +102,15 @@ export const showSelection = (inst, defaultOnly=false, runningOnly=true) => {
 }
 
 // Creating multidropdown with all available Shows
-export const showSelectionMulti = (inst, defaultOnly=false, runningOnly=false) => {
+export const showSelectionMulti = (inst, defaultOnly = false, runningOnly = false) => {
     const defaultShows = []
     const showChoices = []
-    
+
     for (const [id, show] of Object.entries(inst.data.shows || {})) {
         // Check both running (from /launcher) and started (from /lino/shows)
         const isActive = show.running || show.started
         if (runningOnly && !isActive) continue
-        
+
         defaultShows.push(id)
         const status = isActive ? '🟢' : '⚪'
         showChoices.push({ id: id, label: `${status} ${show.name}` })
@@ -172,7 +172,7 @@ export const loadEngines = async (inst) => {
     // ========== FETCH SHOWS (Launcher API - Rich Data) ==========
     // GET /api/rest/v1/launcher - Shows with renderers, projects, graphs
     const launcherData = await inst.GET('launcher', {}, 'medium')
-    
+
     if (launcherData !== null && Array.isArray(launcherData)) {
         for (const show of launcherData) {
             shows[show.id] = {
@@ -206,7 +206,7 @@ export const loadEngines = async (inst) => {
     // ========== FETCH LINO SHOWS (for loadedRundownsInfo) ==========
     // GET /api/rest/v1/lino/shows - Shows with loadedRundownsInfo
     const linoEnginesData = await inst.GET('lino/shows', {}, 'medium')
-    
+
     if (linoEnginesData !== null && Array.isArray(linoEnginesData)) {
         for (const linoShow of linoEnginesData) {
             // Merge loadedRundownsInfo into shows
@@ -229,7 +229,7 @@ export const loadEngines = async (inst) => {
         // Set primary show ID (prefer running shows - check both running and started)
         const runningShow = Object.entries(shows).find(([id, s]) => s.running === true || s.started === true)
         inst.data.primaryShowId = runningShow ? runningShow[0] : Object.keys(shows)[0]
-        
+
         inst.log('debug', `Found ${Object.keys(shows).length} Shows. Primary Show ID: ${inst.data.primaryShowId}`)
     } else {
         inst.data.primaryShowId = null
@@ -240,14 +240,14 @@ export const loadEngines = async (inst) => {
     // This map is critical for rundown button triggers
     // Include ALL shows that have loadedRundowns (regardless of running status)
     inst.data.rundownToShowMap = {}
-    
+
     // Log all shows for debugging
     for (const [showId, show] of Object.entries(shows)) {
         const status = (show.running || show.started) ? '🟢 RUNNING' : '⚪ STOPPED'
         const rdCount = (show.loadedRundowns || []).length
         const rdNames = (show.loadedRundowns || []).map(r => `${r.id}:${r.name}`).join(', ')
         inst.log('debug', `Show ${showId} "${show.name}" ${status} - ${rdCount} rundowns: [${rdNames}]`)
-        
+
         // Map ALL shows with loaded rundowns (not just running ones)
         if (show.loadedRundowns && show.loadedRundowns.length > 0) {
             for (const rd of show.loadedRundowns) {
@@ -275,31 +275,31 @@ export const loadEngines = async (inst) => {
 
     // Update data if changed
     const enginesChanged = !isEqual(inst.data.engines, engines)
-    
+
     // Custom check for Shows: Only care about running/started and loadedRundowns
     // This prevents false positives from deep object comparison of complex renderer data
     let showsChanged = false
     const oldShows = inst.data.shows || {}
     const showIds = new Set([...Object.keys(oldShows), ...Object.keys(shows)])
-    
+
     for (const id of showIds) {
         const oldShow = oldShows[id]
         const newShow = shows[id]
-        
+
         if (!oldShow || !newShow) {
             showsChanged = true // Show added or removed
             break
         }
-        
+
         if (oldShow.running !== newShow.running || oldShow.started !== newShow.started) {
             showsChanged = true // Status changed
             break
         }
-        
+
         // Check loaded rundowns (IDs only)
         const oldRundowns = (oldShow.loadedRundowns || []).map(r => r.id).sort().join(',')
         const newRundowns = (newShow.loadedRundowns || []).map(r => r.id).sort().join(',')
-        
+
         if (oldRundowns !== newRundowns) {
             showsChanged = true // Rundowns changed
             break
@@ -319,18 +319,18 @@ export const loadEngines = async (inst) => {
 
         // Set variable values
         inst.updateVariables(val)
-        
+
         // Update Action Definitions (dropdowns) immediately when show structure changes
         inst.setActionDefinitions(getActions(inst))
-        
+
         // Update Preset Definitions to reflect show status (colors change for active/inactive shows)
         inst.setPresetDefinitions(getPresets(inst))
-        
+
         // Check show status feedbacks to update already-placed buttons
         inst.checkFeedbacks('showStatusInactive')
         inst.checkFeedbacks('showRunning')
         inst.checkFeedbacks('showStopped')
-        
+
         inst.log('info', `Updated: ${Object.keys(engines).length} Reality Engines, ${Object.keys(shows).length} Shows`)
     } else {
         // Only update duration variable
@@ -345,7 +345,7 @@ export const loadEngines = async (inst) => {
 
     // ========== TRIGGER DEPENDENT UPDATES ==========
     // Now that we have fresh Engines and Shows data, trigger other updates
-    
+
     // RUNDOWNS
     if (shouldUpdate(inst, 'rundowns', 'lastRundownUpdate', showsChanged)) {
         if (showsChanged) inst.log('info', 'Show configuration changed - Triggering immediate rundown update')
