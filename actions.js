@@ -5,7 +5,7 @@ import { rundownButtonOptions, rundownItemOptions, rundownPlayNextOptions, refre
 import { templateButtonOptions } from './features/templates.js'
 import { sString, contains, deepSetProperty, featureInactive, convertToFunctionId, featureLogic } from './tools.js'
 import { engineSelection } from './features/engines.js'
-import { channelSelection } from './features/channels.js'
+
 
 // ============ BUTTON DEBOUNCE & OPTIMISTIC UI ============
 // Prevents rapid repeated button presses and provides instant visual feedback
