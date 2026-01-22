@@ -5,6 +5,16 @@ import { getFeedbacks } from '../feedbacks.js'
 import { getPresets } from '../presets.js'
 import { keyValueLogic, ms2S, isEqual } from '../tools.js'
 
+/**
+ * Get display name for a template item, with fallback to template name or "Untitled"
+ * @param {Object} item - Item object with name and template properties
+ * @returns {string} Display name for the item
+ */
+const getTemplateItemDisplayName = (item) => {
+    if (item?.name && item.name.trim()) return item.name
+    if (item?.template && item.template.trim()) return item.template
+    return 'Untitled'
+}
 
 
 // creates dropdown options for all rundown buttons with visibility logic
@@ -25,7 +35,7 @@ export const templateButtonOptions = (templates) => {
     if (rundown.items !== undefined) for (const [iID, item] of Object.entries(rundown.items)) {
         const iIDs = `r${rID}_i${iID}`
         if (tOption.default == undefined) tOption.default = iIDs
-        tOption.choices.push({ id: iIDs, label: item.name })
+        tOption.choices.push({ id: iIDs, label: getTemplateItemDisplayName(item) })
 
         if (item.buttons !== undefined && Object.keys(item.buttons).length > 0) {
 
@@ -58,7 +68,7 @@ export const templateButtonOptions = (templates) => {
         }
     }
 
-    return [ tOption ].concat(buttons)
+    return [tOption].concat(buttons)
 }
 
 // load data related to templates
@@ -85,7 +95,7 @@ export const loadTemplates = async (inst) => {
     inst.data.module.updateTemplatesProgress = 0
 
     // update "updateTemplatesProgress" variable
-    inst.updateVariables({ updateTemplatesProgress:  inst.data.module.updateTemplatesProgress + '%' })
+    inst.updateVariables({ updateTemplatesProgress: inst.data.module.updateTemplatesProgress + '%' })
 
     let templates = {}
     let templatePool = {}
@@ -115,7 +125,7 @@ export const loadTemplates = async (inst) => {
         // Search for template pool rundown across all Lino engines
         let foundLinoEngineId = null
         const linoEngineIds = Object.keys(inst.data.linoEngines)
-        
+
         for (const linoEngineId of linoEngineIds) {
             const rundownsData = await inst.GET(`lino/rundowns/${linoEngineId}`, {}, 'medium')
             if (rundownsData !== null && Array.isArray(rundownsData)) {
@@ -134,7 +144,7 @@ export const loadTemplates = async (inst) => {
         currentStep++
 
         // update progress data
-        inst.data.module.updateTemplatesProgress = Math.floor(100*currentStep/totalSteps)
+        inst.data.module.updateTemplatesProgress = Math.floor(100 * currentStep / totalSteps)
         inst.updateVariables({ updateTemplatesProgress: inst.data.module.updateTemplatesProgress + '%' })
         if (!inst.moduleInitiated) inst.updateStatus('LOAD: Templates data ...', inst.data.module.updateTemplatesProgress + '%')
 
@@ -149,7 +159,7 @@ export const loadTemplates = async (inst) => {
         else {
             // Store the Lino engine ID with template pool info
             templatePool.linoEngineId = foundLinoEngineId
-            
+
             // request items of templatePool rundown using correct Lino engine ID
             const templatePoolItemsData = await inst.GET(`lino/rundown/${foundLinoEngineId}/${templatePool.id}/items/`, {}, 'medium')
 
@@ -171,7 +181,7 @@ export const loadTemplates = async (inst) => {
 
                     // update item - Lino might not need PATCH update to refresh data if GET returns it
                     // skipping PATCH for now as it was likely a trigger to refresh legacy data
-                    
+
                     // update "templates" object with item properties
                     const itemId = item.id
                     templates[templatePool.id].items[itemId] = {
@@ -192,7 +202,7 @@ export const loadTemplates = async (inst) => {
 
                     // update progress if current step is below total steps
                     if (currentStep < totalSteps) {
-                        inst.data.module.updateTemplatesProgress = Math.floor(100*currentStep/totalSteps)
+                        inst.data.module.updateTemplatesProgress = Math.floor(100 * currentStep / totalSteps)
                         inst.updateVariables({ updateTemplatesProgress: inst.data.module.updateTemplatesProgress + '%' })
                         if (!inst.moduleInitiated) inst.updateStatus('LOAD: Templates data ...', inst.data.module.updateTemplatesProgress + '%')
                     }
@@ -204,7 +214,7 @@ export const loadTemplates = async (inst) => {
         currentStep++
 
         // update progress data
-        inst.data.module.updateTemplatesProgress = Math.floor(100*currentStep/totalSteps)
+        inst.data.module.updateTemplatesProgress = Math.floor(100 * currentStep / totalSteps)
         inst.updateVariables({ updateTemplatesProgress: inst.data.module.updateTemplatesProgress + '%' })
         if (!inst.moduleInitiated) inst.updateStatus('LOAD: Templates data ...', inst.data.module.updateTemplatesProgress + '%')
 
@@ -240,7 +250,7 @@ export const loadTemplates = async (inst) => {
 
             // update progress if current step is below total steps
             if (currentStep < totalSteps) {
-                inst.data.module.updateTemplatesProgress = Math.floor(100*currentStep/totalSteps)
+                inst.data.module.updateTemplatesProgress = Math.floor(100 * currentStep / totalSteps)
                 inst.updateVariables({ updateTemplatesProgress: inst.data.module.updateTemplatesProgress + '%' })
                 if (!inst.moduleInitiated) inst.updateStatus('LOAD: Templates data ...', inst.data.module.updateTemplatesProgress + '%')
             }
@@ -249,7 +259,7 @@ export const loadTemplates = async (inst) => {
         // in case templates where added to templatesPool
         if (templatesAdded && templatePool.id !== undefined && foundLinoEngineId) {
             templates = {}
-            
+
             // request templatesPool using correct Lino engine ID
             const poolData = await inst.GET(`lino/rundown/${foundLinoEngineId}/${templatePool.id}/items/`, {}, 'medium')
             if (poolData !== null && Array.isArray(poolData)) {
@@ -296,18 +306,18 @@ export const loadTemplates = async (inst) => {
         inst.setActionDefinitions(getActions(inst))
         inst.setFeedbackDefinitions(getFeedbacks(inst))
         inst.checkFeedbacks('templateButtonLabel')
-		inst.setPresetDefinitions(getPresets(inst))
+        inst.setPresetDefinitions(getPresets(inst))
     }
 
     // set progress to 100%
     inst.data.module.updateTemplatesProgress = 100
 
     // save elapsed time
-    inst.data.module.updateTemplatesDuration = Date.now()-start
+    inst.data.module.updateTemplatesDuration = Date.now() - start
 
     // update variables
     inst.updateVariables({
-        updateTemplatesProgress:  inst.data.module.updateTemplatesProgress + '%',
+        updateTemplatesProgress: inst.data.module.updateTemplatesProgress + '%',
         updateTemplatesDuration: `${ms2S(inst.data.module.updateTemplatesDuration)}s`,
     })
 

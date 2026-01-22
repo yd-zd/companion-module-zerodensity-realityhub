@@ -53,7 +53,7 @@ import { keyValueLogic, ms2S, isEqual } from '../tools.js'
 export const getItemStatus = (inst, rundownId, itemId) => {
     const rundown = inst.data.rundowns?.[rundownId]
     if (!rundown?.items) return null
-    
+
     const item = rundown.items[itemId]
     return item?.status || null
 }
@@ -69,7 +69,7 @@ export const getItemStatus = (inst, rundownId, itemId) => {
 export const isItemPlaying = (inst, rundownId, itemId, channel) => {
     const status = getItemStatus(inst, rundownId, itemId)
     if (!status) return false
-    
+
     return status[channel] === 'Playing'
 }
 
@@ -83,7 +83,7 @@ export const isItemPlaying = (inst, rundownId, itemId, channel) => {
 export const isItemActive = (inst, rundownId, itemId) => {
     const status = getItemStatus(inst, rundownId, itemId)
     if (!status) return false
-    
+
     return status.isActive === true
 }
 
@@ -98,7 +98,7 @@ export const isItemActive = (inst, rundownId, itemId) => {
 export const isChannelAvailable = (inst, rundownId, itemId, channel) => {
     const status = getItemStatus(inst, rundownId, itemId)
     if (!status) return true // No status info = assume available
-    
+
     const channelStatus = status[channel]
     // Official API uses "Unavailable", legacy may use "Idle" - support both
     return ['Available', 'Playing'].includes(channelStatus)
@@ -119,7 +119,7 @@ export const isChannelAvailable = (inst, rundownId, itemId, channel) => {
 export const isItemOnline = (inst, rundownId, itemId) => {
     const status = getItemStatus(inst, rundownId, itemId)
     if (!status) return true // No status info = assume online (backward compat)
-    
+
     return status.online === true
 }
 
@@ -133,9 +133,20 @@ export const isItemOnline = (inst, rundownId, itemId) => {
 export const getItemType = (inst, rundownId, itemId) => {
     const rundown = inst.data.rundowns?.[rundownId]
     if (!rundown?.items) return null
-    
+
     const item = rundown.items[itemId]
     return item?.itemType || null
+}
+
+/**
+ * Get display name for an item, with fallback to template name or "Untitled"
+ * @param {Object} item - Item object with name and template properties
+ * @returns {string} Display name for the item
+ */
+export const getItemDisplayName = (item) => {
+    if (item?.name && item.name.trim()) return item.name
+    if (item?.template && item.template.trim()) return item.template
+    return 'Untitled'
 }
 
 /**
@@ -151,10 +162,10 @@ export const refreshRundownItemStatus = async (inst, showId, rundownId, delayMs 
     if (delayMs > 0) {
         await new Promise(resolve => setTimeout(resolve, delayMs))
     }
-    
+
     try {
         const itemsData = await inst.GET(`lino/rundown/${showId}/${rundownId}/items/`, {}, 'fast')
-        
+
         if (itemsData !== null && Array.isArray(itemsData) && inst.data.rundowns[rundownId]) {
             // Update status for each item
             for (const item of itemsData) {
@@ -163,7 +174,7 @@ export const refreshRundownItemStatus = async (inst, showId, rundownId, delayMs 
                     inst.data.rundowns[rundownId].items[itemId].status = item.status || null
                 }
             }
-            
+
             // Update feedbacks immediately
             inst.checkFeedbacks(
                 'itemPlayingInProgram',
@@ -173,7 +184,7 @@ export const refreshRundownItemStatus = async (inst, showId, rundownId, delayMs 
                 'itemOffline',
                 'itemNotActive'
             )
-            
+
             inst.log('debug', `Refreshed item status for rundown ${rundownId}`)
         }
     } catch (e) {
@@ -188,27 +199,27 @@ export const refreshRundownItemStatus = async (inst, showId, rundownId, delayMs 
 export const rundownSelection = (inst, includeAll = false) => {
     const choices = []
     let defaultChoice = undefined
-    
+
     const rundowns = inst.data.rundowns || {}
     const rundownToShowMap = inst.data.rundownToShowMap || {}
     const shows = inst.data.shows || {}
-    
+
     for (const [rID, rundown] of Object.entries(rundowns)) {
         const showId = rundownToShowMap[rID]
         const show = showId ? shows[showId] : null
-        
+
         // Skip rundowns not loaded on any running show (unless includeAll)
         // Check both running (from /launcher) and started (from /lino/shows)
         const isShowActive = show && (show.running || show.started)
         if (!includeAll && !isShowActive) continue
-        
+
         const showName = show ? show.name : 'Unknown'
         const label = `${rundown.name} (${showName})`
-        
+
         if (defaultChoice === undefined) defaultChoice = rID
         choices.push({ id: rID, label: label })
     }
-    
+
     return {
         type: 'dropdown',
         id: 'rundown',
@@ -234,14 +245,14 @@ export const rundownItemOptions = (rundowns, rundownToShowMap, shows) => {
     for (const [rID, rundown] of Object.entries(rundowns)) {
         const showId = rundownToShowMap ? rundownToShowMap[rID] : null
         const show = showId && shows ? shows[showId] : null
-        
+
         // Only include rundowns that are loaded on running shows
         const isShowActive = show && (show.running || show.started)
         if (!isShowActive) continue
-        
+
         const rIDs = `r${rID}`
         const showName = show.name
-        
+
         if (rOption.default === undefined) rOption.default = rIDs
         rOption.choices.push({ id: rIDs, label: `${rundown.name} (${showName})` })
 
@@ -259,7 +270,7 @@ export const rundownItemOptions = (rundowns, rundownToShowMap, shows) => {
             for (const [iID, item] of Object.entries(rundown.items)) {
                 const iIDs = `r${rID}_i${iID}`
                 if (itemOption.default === undefined) itemOption.default = iIDs
-                itemOption.choices.push({ id: iIDs, label: `#${iID} ${item.name}` })
+                itemOption.choices.push({ id: iIDs, label: `#${iID} ${getItemDisplayName(item)}` })
             }
         }
 
@@ -295,13 +306,13 @@ export const rundownPlayNextOptions = (rundowns, rundownToShowMap, shows) => {
     for (const [rID, rundown] of Object.entries(rundowns)) {
         const showId = rundownToShowMap ? rundownToShowMap[rID] : null
         const show = showId && shows ? shows[showId] : null
-        
+
         const isShowActive = show && (show.running || show.started)
         if (!isShowActive) continue
-        
+
         const rIDs = `r${rID}`
         const showName = show.name
-        
+
         if (rOption.default === undefined) rOption.default = rIDs
         rOption.choices.push({ id: rIDs, label: `${rundown.name} (${showName})` })
     }
@@ -338,15 +349,15 @@ export const rundownButtonOptions = (rundowns, rundownToShowMap, shows) => {
     for (const [rID, rundown] of Object.entries(rundowns)) {
         const showId = rundownToShowMap ? rundownToShowMap[rID] : null
         const show = showId && shows ? shows[showId] : null
-        
+
         // Only include rundowns that are loaded on running shows
         // Check both running (from /launcher) and started (from /lino/shows)
         const isShowActive = show && (show.running || show.started)
         if (!isShowActive) continue
-        
+
         const rIDs = `r${rID}`
         const showName = show.name
-        
+
         if (rOption.default === undefined) rOption.default = rIDs
         rOption.choices.push({ id: rIDs, label: `${rundown.name} (${showName})` })
         allowed.push(rIDs)
@@ -365,7 +376,7 @@ export const rundownButtonOptions = (rundowns, rundownToShowMap, shows) => {
             for (const [iID, item] of Object.entries(rundown.items)) {
                 const iIDs = `r${rID}_i${iID}`
                 if (itemOption.default === undefined) itemOption.default = iIDs
-                itemOption.choices.push({ id: iIDs, label: item.name })
+                itemOption.choices.push({ id: iIDs, label: getItemDisplayName(item) })
                 allowed.push(iIDs)
 
                 const buttonOption = {
@@ -417,11 +428,11 @@ export const loadRundowns = async (inst) => {
 
     let totalSteps = 0
     let currentStep = 0
-    
+
     // Check if we have Shows with rundown data
     const shows = inst.data.shows || {}
     const rundownToShowMap = inst.data.rundownToShowMap || {}
-    
+
     if (Object.keys(shows).length === 0) {
         inst.log('warn', 'Skipping rundown update: No Shows available')
         inst.data.module.updateRundownsData = false
@@ -437,11 +448,11 @@ export const loadRundowns = async (inst) => {
     const targetShows = Object.entries(shows).filter(([id, show]) => {
         // Must have loaded rundowns
         if (!show.loadedRundowns || show.loadedRundowns.length === 0) return false
-        
+
         // We filter rundowns later by name, so we include all shows that have rundowns here
         return true
     })
-    
+
     if (targetShows.length === 0) {
         // Only warn if we really have no shows with rundowns
         if (!hasFilter) {
@@ -450,7 +461,7 @@ export const loadRundowns = async (inst) => {
         inst.data.module.updateRundownsData = false
         return
     }
-    
+
     const targetShowIds = targetShows.map(([id]) => id)
     // inst.log('info', `Querying rundowns for ${targetShows.length} show(s) with loaded rundowns: ${targetShowIds.join(', ')}`)
 
@@ -469,29 +480,29 @@ export const loadRundowns = async (inst) => {
     // Query rundowns API to get full rundown details (including names)
     // Use /lino/rundowns (without showId) to get ALL rundowns across all shows
     const rundownsData = await inst.GET('lino/rundowns', {}, 'medium')
-    
+
     if (rundownsData === null || !Array.isArray(rundownsData)) {
         inst.log('warn', 'Failed to fetch rundowns from API')
         inst.data.module.updateRundownsData = false
         return
     }
-    
+
     // Filter to only rundowns that are loaded on our target shows
     // AND apply the Rundown Name filter if configured
     const loadedRundowns = rundownsData.filter(rd => {
         // Must be loaded on a show
         if (!loadedRundownIds.has(rd.id)) return false
-        
+
         // Apply Name filter if configured
         if (hasFilter) {
             return showFilter.some(name => rd.name === name || rd.name.includes(name))
         }
-        
+
         return true
     })
-    
+
     // inst.log('info', `Filtered to ${loadedRundowns.length} loaded rundowns out of ${rundownsData.length} total from API`)
-    
+
     totalSteps = loadedRundowns.length + 1
 
     // PARALLEL FETCHING: Fetch all items in parallel using Promise.all
@@ -500,14 +511,14 @@ export const loadRundowns = async (inst) => {
         const showInfo = rundownToShow[rundown.id] || { showId: targetShowIds[0], showName: 'Unknown' }
         const showId = showInfo.showId
         const show = shows[showId]
-        
+
         // Check if show is running (API requires running show for items endpoint)
         const isShowRunning = show && (show.running || show.started)
-        
+
         // Initialize rundown entry using name from API response
         // We preserve existing items if update fails or show is stopped
         const existingItems = rundowns[rundownKey]?.items || {}
-        
+
         const newRundownEntry = {
             name: rundown.name,  // Get name from API, not from loadedRundownsInfo
             showId: showId,
@@ -535,10 +546,10 @@ export const loadRundowns = async (inst) => {
         if (itemsData !== null && Array.isArray(itemsData)) {
             const newItems = {}
             let statusCount = 0
-            
+
             for (const item of itemsData) {
                 const itemId = item.id
-                
+
                 newItems[itemId] = {
                     // Store both name and template - either can be used for display
                     name: item.name || item.template || null,
@@ -549,7 +560,7 @@ export const loadRundowns = async (inst) => {
                     // Store item type: 'vs' = Nodos/VS, 'md' = Motion Design (API v2.1.0)
                     itemType: item.itemType || null
                 }
-                
+
                 // Count items with status for logging
                 if (item.status) statusCount++
 
@@ -561,7 +572,7 @@ export const loadRundowns = async (inst) => {
                 }
             }
             newRundownEntry.items = newItems // Replace items with fresh data
-            
+
             // Log status info for debugging
             if (statusCount > 0) {
                 inst.log('debug', `Loaded ${Object.keys(newItems).length} items for "${rundown.name}" (${statusCount} with status)`)
@@ -570,17 +581,17 @@ export const loadRundowns = async (inst) => {
             // Log as debug, not warning (common for empty rundowns or during load)
             // inst.log('debug', `No items found for rundown "${rundown.name}" (ID: ${rundown.id}) on Show ${showId}`)
         }
-        
+
         // Update progress (atomic increment not needed as we just calculate % at end or periodically)
         // But since this is parallel, we can't easily update progress bar per item sequentially in a meaningful way 
         // without a counter.
-        
+
         return { key: rundownKey, data: newRundownEntry }
     })
-    
+
     // Wait for all item requests to complete
     const results = await Promise.all(itemPromises)
-    
+
     // Update rundowns object with results
     for (const result of results) {
         rundowns[result.key] = result.data
@@ -621,7 +632,7 @@ export const loadRundowns = async (inst) => {
             'itemOffline'
         )
     }
-    
+
     // Set progress to 100%
     inst.data.module.updateRundownsProgress = 100
 

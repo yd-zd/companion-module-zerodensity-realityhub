@@ -2,7 +2,7 @@
 
 import { combineRgb } from '@companion-module/base'
 import { nodePropertiesOptions } from './features/nodes.js'
-import { rundownButtonOptions, getItemStatus, isItemPlaying, isItemActive, isItemOnline, getItemType } from './features/rundowns.js'
+import { rundownButtonOptions, getItemStatus, isItemPlaying, isItemActive, isItemOnline, getItemType, getItemDisplayName } from './features/rundowns.js'
 import { templateButtonOptions } from './features/templates.js'
 import { contains, sString, basicFeedback, featureInactive, deepSetProperty } from './tools.js'
 import { engineSelection, engineSelectionSingle } from './features/engines.js'
@@ -49,7 +49,7 @@ function createFeedbacks(inst) {
                 // parse variables from text input
                 event.options.node = await funcs.parseVariablesInString(event.options.node)
 
-                switch(event.options.type) {
+                switch (event.options.type) {
                     case 'boolean':
                         event.options.property = 'Default//Boolean/0'
                         event.options.value = (event.options.value !== 'true') ? false : true
@@ -61,9 +61,9 @@ function createFeedbacks(inst) {
                         break
 
                     case 'integer':
-                            event.options.property = 'Default//Integer/0'
-                            event.options.value = parseInt(event.options.value)
-                            break
+                        event.options.property = 'Default//Integer/0'
+                        event.options.value = parseInt(event.options.value)
+                        break
 
                     case 'string':
                         event.options.property = 'Default//String/0'
@@ -78,7 +78,7 @@ function createFeedbacks(inst) {
                     || inst.data.nodes[event.options.engine][event.options.node] === undefined
                     || inst.data.nodes[event.options.engine][event.options.node].properties[event.options.property] === undefined)
                     && inst.data.module.feedbackRequestActive[`/e:${event.options.engine}/n:${event.options.node}`] !== true) {
-                    
+
                     // request data from server
                     inst.data.module.feedbackRequestActive[`/e:${event.options.engine}/n:${event.options.node}`] = true
                     inst.log('debug', `FeedbackRequestActive: "/e:${event.options.engine}/n:${event.options.node}"`)
@@ -92,7 +92,7 @@ function createFeedbacks(inst) {
                             if (event.options.property === property.PropertyPath) {
                                 deepSetProperty(
                                     inst.data.nodes,
-                                    [ event.options.engine, event.options.node, 'properties', property.PropertyPath ],
+                                    [event.options.engine, event.options.node, 'properties', property.PropertyPath],
                                     property.Value
                                 )
                             }
@@ -101,7 +101,7 @@ function createFeedbacks(inst) {
                         inst.data.module.feedbackRequestActive[`/e:${event.options.engine}/n:${event.options.node}`] = false
 
                         // if there was a valid response, check this feedback again to update buttons
-                        if (response.length > 0) inst.checkFeedbacks(event.feedbackId) 
+                        if (response.length > 0) inst.checkFeedbacks(event.feedbackId)
                     })
                 }
 
@@ -217,7 +217,7 @@ function createFeedbacks(inst) {
                 event.options.node = await funcs.parseVariablesInString(event.options.node)
                 event.options.value = await inst.parseVariablesInString(event.options[event.options.type])
 
-                switch(event.options.type) {
+                switch (event.options.type) {
                     case 'boolean':
                     case 'booleanVar':
                         event.options.property = 'Default//Boolean/0'
@@ -232,9 +232,9 @@ function createFeedbacks(inst) {
 
                     case 'integer':
                     case 'integerVar':
-                            event.options.property = 'Default//Integer/0'
-                            event.options.value = parseInt(event.options.value)
-                            break
+                        event.options.property = 'Default//Integer/0'
+                        event.options.value = parseInt(event.options.value)
+                        break
 
                     case 'string':
                         event.options.property = 'Default//String/0'
@@ -248,7 +248,7 @@ function createFeedbacks(inst) {
                 return basicFeedback(inst, event, {
                     property: event.options.property,
                     value: event.options.value,
-                    requestProperties: [ event.options.property ]
+                    requestProperties: [event.options.property]
                 })
             }
         },
@@ -300,7 +300,7 @@ function createFeedbacks(inst) {
                 color: combineRgb(255, 255, 255),
                 bgcolor: combineRgb(0, 0, 51)
             },
-            callback: (event) =>  event.options.feature === 'engines' || inst.config.features.findIndex((element) => element === event.options.feature) !== -1
+            callback: (event) => event.options.feature === 'engines' || inst.config.features.findIndex((element) => element === event.options.feature) !== -1
         },
         basicMediaFilePath: {
             type: 'boolean',
@@ -352,7 +352,7 @@ function createFeedbacks(inst) {
                 return basicFeedback(inst, event, {
                     property: 'File//FilePath/0',
                     value: sString(event.options.directory + event.options.path),
-                    requestProperties: [ 'File//FilePath/0' ]
+                    requestProperties: ['File//FilePath/0']
                 })
             }
         },
@@ -376,8 +376,8 @@ function createFeedbacks(inst) {
                     id: 'channel',
                     default: 'Channels//PreviewChannel/0',
                     choices: [
-                        { id: 'Channels//PreviewChannel/0', label: 'Preview'},
-                        { id: 'Channels//ProgramChannel/0', label: 'Program'}
+                        { id: 'Channels//PreviewChannel/0', label: 'Preview' },
+                        { id: 'Channels//ProgramChannel/0', label: 'Program' }
                     ],
                     tooltip: 'Select preview or program channel as target for this feedback'
                 },
@@ -387,16 +387,16 @@ function createFeedbacks(inst) {
                     id: 'name',
                     default: 'Channel1',
                     choices: [
-                        { id: 'Channel1', label: 'Channel 1'},
-                        { id: 'Channel2', label: 'Channel 2'},
-                        { id: 'Channel3', label: 'Channel 3'},
-                        { id: 'Channel4', label: 'Channel 4'},
-                        { id: 'Channel5', label: 'Channel 5'},
-                        { id: 'Channel6', label: 'Channel 6'},
-                        { id: 'Channel7', label: 'Channel 7'},
-                        { id: 'Channel8', label: 'Channel 8'},
-                        { id: 'Channel9', label: 'Channel 9'},
-                        { id: 'Channel10', label: 'Channel 10'}
+                        { id: 'Channel1', label: 'Channel 1' },
+                        { id: 'Channel2', label: 'Channel 2' },
+                        { id: 'Channel3', label: 'Channel 3' },
+                        { id: 'Channel4', label: 'Channel 4' },
+                        { id: 'Channel5', label: 'Channel 5' },
+                        { id: 'Channel6', label: 'Channel 6' },
+                        { id: 'Channel7', label: 'Channel 7' },
+                        { id: 'Channel8', label: 'Channel 8' },
+                        { id: 'Channel9', label: 'Channel 9' },
+                        { id: 'Channel10', label: 'Channel 10' }
                     ],
                     tooltip: 'Enter name of channel. Channel names should match across all engines!'
                 },
@@ -412,7 +412,7 @@ function createFeedbacks(inst) {
                 return basicFeedback(inst, event, {
                     property: event.options.channel,
                     value: event.options.name,
-                    requestProperties: [ 'Channels//ProgramChannel/0', 'Channels//PreviewChannel/0' ]
+                    requestProperties: ['Channels//ProgramChannel/0', 'Channels//PreviewChannel/0']
                 })
             }
         },
@@ -461,15 +461,15 @@ function createFeedbacks(inst) {
                     for (const [inputKey, data] of Object.entries(inst.data.module.inputNodeMappings)) {
                         if (data.nodes.includes(event.options.node) && data.properties.includes(event.options[event.options.node])) {
                             const keys = inputKey.split(',')
-    
+
                             if (keys.length === 1 && event.options[inputKey] !== undefined) {
                                 event.options[inputKey] = await funcs.parseVariablesInString(event.options[inputKey])
                                 if (inputKey === 'number' && event.options[inputKey].toString().includes('.')) {
                                     const decimalLength = parseInt(event.options[inputKey].toString().split('.')[1])
-                                    storedProperty = (Math.round(storedProperty*(10*decimalLength))/(10*decimalLength)).toString()
+                                    storedProperty = (Math.round(storedProperty * (10 * decimalLength)) / (10 * decimalLength)).toString()
                                 }
                                 else if (inputKey === 'number') {
-                                    storedProperty = (Math.round(storedProperty*10)/10).toString()
+                                    storedProperty = (Math.round(storedProperty * 10) / 10).toString()
                                 }
                                 else if (inputKey === 'boolean') storedProperty = storedProperty.toString()
 
@@ -516,23 +516,23 @@ function createFeedbacks(inst) {
                 // Safety check: ensure all required options exist
                 const rundownKey = event.options.rundown
                 if (!rundownKey) return { text: '' }
-                
+
                 const itemSelection = event.options[rundownKey]
                 if (!itemSelection || typeof itemSelection !== 'string') return { text: '' }
-                
+
                 const parts = itemSelection.split('_')
                 if (parts.length < 3) return { text: '' }
-                
+
                 const rID = parts[0]
                 const iID = parts[1]
                 const bID = parts.slice(2).join('_')
                 let label = ''
-                try { label = inst.data.rundowns[rID.substring(1)]?.items?.[iID.substring(1)]?.buttons?.[bID.substring(1)] || ''}
-                catch(error) {}
+                try { label = inst.data.rundowns[rID.substring(1)]?.items?.[iID.substring(1)]?.buttons?.[bID.substring(1)] || '' }
+                catch (error) { }
                 return { text: label }
             }
         }
-        
+
         // Show Status feedback - dims buttons when associated show is not running
         feedbacks.showStatusInactive = {
             type: 'boolean',
@@ -559,24 +559,24 @@ function createFeedbacks(inst) {
             callback: (event) => {
                 const rundownId = event.options.rundown
                 if (!rundownId) return false
-                
+
                 // Find the show for this rundown
                 const showId = inst.data.rundownToShowMap?.[rundownId]
                 if (!showId) return true  // No show mapping = inactive
-                
+
                 const show = inst.data.shows?.[showId]
                 if (!show) return true  // Show not found = inactive
-                
+
                 // Return TRUE if show is INACTIVE (to apply the dim style)
                 const isActive = show.running || show.started
                 return !isActive
             }
         }
-        
+
         // ============ ITEM STATUS FEEDBACKS (NEW) ============
         // These feedbacks change button appearance based on item play status
         // Use the new status API: { preview, program, isActive, activeIn }
-        
+
         // Helper to create item selection dropdown
         const createItemSelectionOptions = () => {
             const options = [
@@ -593,7 +593,7 @@ function createFeedbacks(inst) {
                     })
                 }
             ]
-            
+
             // Add item dropdowns for each rundown
             for (const [rID, rd] of Object.entries(inst.data.rundowns)) {
                 if (rd.items) {
@@ -604,17 +604,17 @@ function createFeedbacks(inst) {
                         default: Object.keys(rd.items)[0] || '',
                         choices: Object.entries(rd.items).map(([iID, item]) => ({
                             id: iID,
-                            label: `#${iID} ${item.name}`
+                            label: `#${iID} ${getItemDisplayName(item)}`
                         })),
                         isVisibleData: { rundown: rID },
                         isVisible: (options, data) => options.rundown === data.rundown
                     })
                 }
             }
-            
+
             return options
         }
-        
+
         // Item Playing in Program - RED when on air
         feedbacks.itemPlayingInProgram = {
             type: 'boolean',
@@ -629,11 +629,11 @@ function createFeedbacks(inst) {
                 const rundownId = event.options.rundown
                 const itemId = event.options[`item_${rundownId}`]
                 if (!rundownId || !itemId) return false
-                
+
                 return isItemPlaying(inst, rundownId, itemId, 'program')
             }
         }
-        
+
         // Item Playing in Preview - GREEN when in preview
         feedbacks.itemPlayingInPreview = {
             type: 'boolean',
@@ -648,11 +648,11 @@ function createFeedbacks(inst) {
                 const rundownId = event.options.rundown
                 const itemId = event.options[`item_${rundownId}`]
                 if (!rundownId || !itemId) return false
-                
+
                 return isItemPlaying(inst, rundownId, itemId, 'preview')
             }
         }
-        
+
         // Item Is Active - YELLOW/GOLD when playing in any channel
         feedbacks.itemIsActive = {
             type: 'boolean',
@@ -667,11 +667,11 @@ function createFeedbacks(inst) {
                 const rundownId = event.options.rundown
                 const itemId = event.options[`item_${rundownId}`]
                 if (!rundownId || !itemId) return false
-                
+
                 return isItemActive(inst, rundownId, itemId)
             }
         }
-        
+
         // Advanced: Multi-state Status Indicator
         // Priority: Program (red) > Preview (green) > Inactive (no change)
         feedbacks.itemStatusIndicator = {
@@ -683,10 +683,10 @@ function createFeedbacks(inst) {
                 const rundownId = event.options.rundown
                 const itemId = event.options[`item_${rundownId}`]
                 if (!rundownId || !itemId) return {}
-                
+
                 const status = getItemStatus(inst, rundownId, itemId)
                 if (!status) return {}
-                
+
                 // Priority: Program > Preview > Inactive
                 if (status.program === 'Playing') {
                     return {
@@ -699,11 +699,11 @@ function createFeedbacks(inst) {
                         color: combineRgb(255, 255, 255)
                     }
                 }
-                
+
                 return {}  // Inactive - use default style
             }
         }
-        
+
         // Item Not Active - Desaturated appearance when item is idle
         // This is the inverse of itemIsActive - applies when item is NOT playing
         feedbacks.itemNotActive = {
@@ -720,21 +720,21 @@ function createFeedbacks(inst) {
                 const rundownId = event.options.rundown
                 const itemId = event.options[`item_${rundownId}`]
                 if (!rundownId || !itemId) return false
-                
+
                 // Check if show is even active first
                 const showId = inst.data.rundownToShowMap?.[rundownId]
                 const show = showId ? inst.data.shows?.[showId] : null
                 const isShowActive = show?.running || show?.started
-                
+
                 // If show is not active, don't apply this feedback
                 // (showStatusInactive handles that case)
                 if (!isShowActive) return false
-                
+
                 // Return TRUE if item is NOT active (to apply the desaturated style)
                 return !isItemActive(inst, rundownId, itemId)
             }
         }
-        
+
         // Item Offline - Shows when item is NOT online (not ready on Reality Engine)
         // The item exists in rundown but isn't loaded/ready on the physical render engine
         feedbacks.itemOffline = {
@@ -751,12 +751,12 @@ function createFeedbacks(inst) {
                 const rundownId = event.options.rundown
                 const itemId = event.options[`item_${rundownId}`]
                 if (!rundownId || !itemId) return false
-                
+
                 // Return TRUE if item is OFFLINE (to apply the warning style)
                 return !isItemOnline(inst, rundownId, itemId)
             }
         }
-        
+
         // Item Type Indicator - Shows different styles for VS vs MD items
         feedbacks.itemTypeVS = {
             type: 'boolean',
@@ -772,11 +772,11 @@ function createFeedbacks(inst) {
                 const rundownId = event.options.rundown
                 const itemId = event.options[`item_${rundownId}`]
                 if (!rundownId || !itemId) return false
-                
+
                 return getItemType(inst, rundownId, itemId) === 'vs'
             }
         }
-        
+
         feedbacks.itemTypeMD = {
             type: 'boolean',
             name: 'Item Type: Motion Design Item',
@@ -791,7 +791,7 @@ function createFeedbacks(inst) {
                 const rundownId = event.options.rundown
                 const itemId = event.options[`item_${rundownId}`]
                 if (!rundownId || !itemId) return false
-                
+
                 return getItemType(inst, rundownId, itemId) === 'md'
             }
         }
@@ -808,19 +808,19 @@ function createFeedbacks(inst) {
                 // Safety check: ensure all required options exist
                 const templateKey = event.options.template
                 if (!templateKey) return { text: '' }
-                
+
                 const itemSelection = event.options[templateKey]
                 if (!itemSelection || typeof itemSelection !== 'string') return { text: '' }
-                
+
                 const parts = itemSelection.split('_')
                 if (parts.length < 3) return { text: '' }
-                
+
                 const rID = parts[0]
                 const iID = parts[1]
                 const bID = parts.slice(2).join('_')
                 let label = ''
-                try { label = inst.data.templates[rID.substring(1)]?.items?.[iID.substring(1)]?.buttons?.[bID.substring(1)] || ''}
-                catch(error) {}
+                try { label = inst.data.templates[rID.substring(1)]?.items?.[iID.substring(1)]?.buttons?.[bID.substring(1)] || '' }
+                catch (error) { }
                 return { text: label }
             }
         }
@@ -834,7 +834,7 @@ function createFeedbacks(inst) {
             id: showId,
             label: show.name
         }))
-        
+
         // Show Running feedback - indicates if show is running
         feedbacks.showRunning = {
             type: 'boolean',
@@ -856,15 +856,15 @@ function createFeedbacks(inst) {
             callback: (event) => {
                 const showId = event.options.showId
                 if (!showId) return false
-                
+
                 const show = inst.data.shows?.[showId]
                 if (!show) return false
-                
+
                 // Return TRUE if show IS RUNNING (to apply the green style)
                 return show.running || show.started
             }
         }
-        
+
         // Show Stopped feedback - indicates if show is stopped
         feedbacks.showStopped = {
             type: 'boolean',
@@ -886,15 +886,15 @@ function createFeedbacks(inst) {
             callback: (event) => {
                 const showId = event.options.showId
                 if (!showId) return false
-                
+
                 const show = inst.data.shows?.[showId]
                 if (!show) return true  // No show = treat as stopped
-                
+
                 // Return TRUE if show IS STOPPED (to apply the gray style)
                 return !show.running && !show.started
             }
         }
-        
+
         // Stop Show Armed feedback - indicates if stop is ARMED (pending confirmation)
         feedbacks.stopShowArmed = {
             type: 'boolean',
@@ -917,11 +917,11 @@ function createFeedbacks(inst) {
             callback: (event) => {
                 const showId = event.options.showId
                 if (!showId) return false
-                
+
                 // Check if this show is armed for stopping
                 const armedTime = inst.data.stopArmed?.[showId]
                 if (!armedTime) return false
-                
+
                 // Check if still within timeout (3 seconds)
                 const now = Date.now()
                 return (now - armedTime) < 3000
