@@ -49,7 +49,7 @@ Nodos form (custom property) buttons now ignore item availability/online status.
 - `actions.js` - Added `next` action and availability blocking logic.
 - `feedbacks.js` - Added 7 new broadcast/functional feedback types.
 - `presets.js` - Centralized feedback stack logic and added `NEXT` preset.
-- `package.json` - Version bumped to 2.2.0.
+- `package.json` - Version bumped to 2.1.18.
 
 ---
 
