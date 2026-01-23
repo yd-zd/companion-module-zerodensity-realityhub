@@ -68,7 +68,10 @@ const applyOptimisticUpdate = (inst, rundownId, itemId, channelKey, willBePlayin
         'itemStatusIndicator',
         'itemNotActive',
         'itemOffline',
-        'itemTypeDisplay'
+        'itemTypeVS',
+        'itemTypeMD',
+        'itemOnlineMD',
+        'itemOnlineVS'
     )
 
     inst.log('debug', `Optimistic update: Item ${itemId} ${channelKey}=${willBePlaying ? 'Playing' : 'Available'}`)
@@ -861,6 +864,13 @@ function createActions(inst) {
                 const channelName = channel === '1' ? 'Preview' : 'Program'
                 const channelKey = channel === '1' ? 'preview' : 'program'
 
+                // Check channel availability
+                const status = getItemStatus(inst, rundownId, itemId)
+                if (status?.[channelKey] === 'Unavailable') {
+                    inst.log('warn', `Cannot play item: ${channelName} channel is Unavailable for this item.`)
+                    return
+                }
+
                 // Check cooldown
                 const cooldownKey = `${rundownId}_${itemId}_${channel}_play`
                 if (isInCooldown(cooldownKey)) {
@@ -943,6 +953,15 @@ function createActions(inst) {
 
                 const { rundownId, showId, itemId, show, channel } = parsed
                 const channelName = channel === '1' ? 'Preview' : 'Program'
+                const channelKey = channel === '1' ? 'preview' : 'program'
+
+                // Check channel availability
+                const status = getItemStatus(inst, rundownId, itemId)
+                if (status?.[channelKey] === 'Unavailable') {
+                    inst.log('warn', `Cannot continue item: ${channelName} channel is Unavailable for this item.`)
+                    return
+                }
+
                 const endpoint = `lino/rundown/${showId}/continue/${itemId}/${channel}`
 
                 inst.log('debug', `Continuing item on ${channelName}: Show="${show?.name}", Item=${itemId}`)
@@ -952,6 +971,43 @@ function createActions(inst) {
                     inst.log('warn', `Continue item may have failed for: ${endpoint}`)
                 } else {
                     // Refresh status immediately after successful command
+                    refreshRundownItemStatus(inst, showId, rundownId)
+                }
+            }
+        }
+
+        // Next Item: PUT /lino/rundown/{showId}/next/{itemId}/{channel}
+        actions.rundownItemNext = {
+            name: 'Rundown: Next Item Step',
+            description: 'Play the next cue/step of a rundown item on Program (PGM) or Preview (PVW)',
+            options: rundownItemOptions(inst.data.rundowns, inst.data.rundownToShowMap, inst.data.shows),
+            callback: async (event) => {
+                const parsed = parseRundownItemSelection(event)
+                if (!parsed || !parsed.showId) {
+                    inst.log('error', 'Cannot trigger next: Invalid selection')
+                    return
+                }
+
+                const { rundownId, showId, itemId, show, channel } = parsed
+                const channelName = channel === '1' ? 'Preview' : 'Program'
+                const channelKey = channel === '1' ? 'preview' : 'program'
+
+                // Check channel availability
+                const status = getItemStatus(inst, rundownId, itemId)
+                if (status?.[channelKey] === 'Unavailable') {
+                    inst.log('warn', `Cannot trigger next: ${channelName} channel is Unavailable for this item.`)
+                    return
+                }
+
+                const endpoint = `lino/rundown/${showId}/next/${itemId}/${channel}`
+
+                inst.log('debug', `Triggering next on ${channelName}: Show="${show?.name}", Item=${itemId}`)
+
+                const response = await inst.PUT(endpoint)
+                if (response === null) {
+                    inst.log('warn', `Next item step may have failed for: ${endpoint}`)
+                } else {
+                    // Refresh status immediately
                     refreshRundownItemStatus(inst, showId, rundownId)
                 }
             }
@@ -984,6 +1040,15 @@ function createActions(inst) {
                 // Check current play state
                 const isPlaying = isItemPlaying(inst, rundownId, itemId, channelKey)
                 const willBePlaying = !isPlaying
+
+                // Check channel availability only when trying to PLAY
+                if (willBePlaying) {
+                    const status = getItemStatus(inst, rundownId, itemId)
+                    if (status?.[channelKey] === 'Unavailable') {
+                        inst.log('warn', `Cannot play item: ${channelName} channel is Unavailable for this item.`)
+                        return
+                    }
+                }
 
                 // OPTIMISTIC UI: Immediately update visual state before API call
                 applyOptimisticUpdate(inst, rundownId, itemId, channelKey, willBePlaying)

@@ -63,11 +63,126 @@ const createShowStatusFeedback = (rundownId) => ({
 })
 
 /**
+ * Unified feedback stack for PVW, PGM, and CONT buttons
+ * Follows states: Show Down -> Item Offline -> Channel Available (Dim PGM/PVW) -> Channel Unavailable -> Feedback (Active)
+ * @param {string} rundownId 
+ * @param {string} itemId 
+ * @param {string} shortName 
+ * @param {string} buttonType 'pvw', 'pgm', or 'cont'
+ */
+const getItemButtonFeedbacks = (rundownId, itemId, shortName, buttonType) => {
+    const channelKey = (buttonType === 'pvw') ? 'preview' : 'program'
+    const suffix = (buttonType === 'pvw') ? 'PVW' : 'PGM'
+
+    const feedbacks = [
+        createShowStatusFeedback(rundownId), // 1. Show stopped (lowest priority)
+    ]
+
+    // Nodos form buttons are independent of item Render status (Online/Offline/Available)
+    // They only need the Show status to indicate if the show is running.
+    if (buttonType === 'nodos') {
+        return feedbacks
+    }
+
+    // 2. Item Offline (Show stopped, engine down, or asset not loaded)
+    feedbacks.push({
+        feedbackId: 'itemStatusOffline',
+        options: { rundown: rundownId, [`item_${rundownId}`]: itemId },
+        style: {
+            color: combineRgb(140, 140, 140),
+            bgcolor: combineRgb(40, 40, 40)
+        }
+    })
+
+    // 3. Channel/Function Available (Functional Grouping)
+    if (buttonType === 'pgm') {
+        feedbacks.push({
+            feedbackId: 'itemProgramAvailable',
+            options: { rundown: rundownId, [`item_${rundownId}`]: itemId },
+            style: {
+                color: combineRgb(200, 200, 200),
+                bgcolor: combineRgb(100, 30, 30) // Dark Red for PGM
+            }
+        })
+    } else if (buttonType === 'pvw') {
+        feedbacks.push({
+            feedbackId: 'itemPreviewAvailable',
+            options: { rundown: rundownId, [`item_${rundownId}`]: itemId },
+            style: {
+                color: combineRgb(200, 200, 200),
+                bgcolor: combineRgb(20, 80, 40)  // Dark Green for PVW
+            }
+        })
+    } else if (buttonType === 'cont') {
+        // Continue is YELLOW/AMBER
+        feedbacks.push({
+            feedbackId: 'itemContAvailable',
+            options: { rundown: rundownId, [`item_${rundownId}`]: itemId },
+            style: {
+                color: combineRgb(200, 200, 200),
+                bgcolor: combineRgb(100, 80, 0) // Dark Amber
+            }
+        })
+    } else if (buttonType === 'next') {
+        // Next Step is BLUE
+        feedbacks.push({
+            feedbackId: 'itemNextAvailable',
+            options: { rundown: rundownId, [`item_${rundownId}`]: itemId },
+            style: {
+                color: combineRgb(200, 200, 200),
+                bgcolor: combineRgb(10, 40, 80) // Dark Blue
+            }
+        })
+    }
+
+    // 4. Channel Specific UNAVAILABLE (New)
+    // If the specific channel (PGM or PVW) is unavailable, it dims the button even if item is "online"
+    if (buttonType === 'pvw' || buttonType === 'pgm') {
+        feedbacks.push({
+            feedbackId: 'itemChannelUnavailable',
+            options: { rundown: rundownId, [`item_${rundownId}`]: itemId, channel: channelKey },
+            style: {
+                color: combineRgb(120, 120, 120),
+                bgcolor: combineRgb(30, 30, 30),
+                text: `${shortName}\\n❌ ${suffix}` // Show cross if unavailable
+            }
+        })
+    }
+
+    // 5. Active state - Highest priority
+    if (buttonType === 'pvw') {
+        feedbacks.push(createPreviewToggleFeedback(rundownId, itemId, shortName))
+    } else if (buttonType === 'pgm') {
+        feedbacks.push(createProgramToggleFeedback(rundownId, itemId, shortName))
+    } else if (buttonType === 'cont') {
+        feedbacks.push({
+            feedbackId: 'itemContActive',
+            options: { rundown: rundownId, [`item_${rundownId}`]: itemId },
+            style: {
+                color: combineRgb(0, 0, 0),
+                bgcolor: combineRgb(255, 200, 0) // Bright Yellow
+            }
+        })
+    } else if (buttonType === 'next') {
+        feedbacks.push({
+            feedbackId: 'itemNextActive',
+            options: { rundown: rundownId, [`item_${rundownId}`]: itemId },
+            style: {
+                color: combineRgb(255, 255, 255),
+                bgcolor: combineRgb(0, 150, 255) // Bright Cyan/Blue
+            }
+        })
+    }
+
+    return feedbacks
+}
+
+/**
  * Create feedback object for item not active - DESATURATED when idle
  */
 const createItemNotActiveFeedback = (rundownId, itemId, bgR, bgG, bgB) => ({
     feedbackId: 'itemNotActive',
-    options: { 
+    options: {
         rundown: rundownId,
         [`item_${rundownId}`]: itemId
     },
@@ -82,7 +197,7 @@ const createItemNotActiveFeedback = (rundownId, itemId, bgR, bgG, bgB) => ({
  */
 const createItemPlayingProgramFeedback = (rundownId, itemId) => ({
     feedbackId: 'itemPlayingInProgram',
-    options: { 
+    options: {
         rundown: rundownId,
         [`item_${rundownId}`]: itemId
     },
@@ -97,7 +212,7 @@ const createItemPlayingProgramFeedback = (rundownId, itemId) => ({
  */
 const createItemPlayingPreviewFeedback = (rundownId, itemId) => ({
     feedbackId: 'itemPlayingInPreview',
-    options: { 
+    options: {
         rundown: rundownId,
         [`item_${rundownId}`]: itemId
     },
@@ -113,7 +228,7 @@ const createItemPlayingPreviewFeedback = (rundownId, itemId) => ({
  */
 const createProgramToggleFeedback = (rundownId, itemId, shortName) => ({
     feedbackId: 'itemPlayingInProgram',
-    options: { 
+    options: {
         rundown: rundownId,
         [`item_${rundownId}`]: itemId
     },
@@ -130,7 +245,7 @@ const createProgramToggleFeedback = (rundownId, itemId, shortName) => ({
  */
 const createPreviewToggleFeedback = (rundownId, itemId, shortName) => ({
     feedbackId: 'itemPlayingInPreview',
-    options: { 
+    options: {
         rundown: rundownId,
         [`item_${rundownId}`]: itemId
     },
@@ -147,7 +262,7 @@ const createPreviewToggleFeedback = (rundownId, itemId, shortName) => ({
  */
 const createItemOfflineFeedback = (rundownId, itemId) => ({
     feedbackId: 'itemOffline',
-    options: { 
+    options: {
         rundown: rundownId,
         [`item_${rundownId}`]: itemId
     },
@@ -197,13 +312,13 @@ const getShowEngineIcons = (show, engines) => {
     if (!show?.renderers || show.renderers.length === 0) {
         return '⚪'  // No engines attached
     }
-    
+
     const icons = show.renderers.map(renderer => {
         const engineId = renderer.engineHostId
         const engine = engines?.[engineId]
         return getEngineStatusIcon(engine?.status)
     })
-    
+
     return icons.join('')
 }
 
@@ -250,131 +365,131 @@ export const getPresets = (inst) => {
             }
         ]
     },
-    {
-        category: 'Basic: Features',
-        name: 'Update Nodes Data',
-        type: 'button',
-        style: {
-            text: 'NOD:\\n' + variablePath(inst, 'updateNodesProgress') + '\\n' + variablePath(inst, 'updateNodesDuration'),
-            size: '18',
-            color: combineRgb(255, 255, 255),
-            bgcolor: combineRgb(51, 0, 0)
-        },
-        steps: [
-            {
-                down: [
-                    {
-                        actionId: 'basicLoadFeatureData',
-                        options: { data: 'updateNodesData' }
-                    }
-                ]
-            }
-        ],
-        feedbacks: [
-            {
-                feedbackId: 'basicFeatureSelected',
-                options: { feature: 'nodes' },
-                style: {
-                    color: combineRgb(255, 255, 255),
-                    bgcolor: combineRgb(0, 0, 51)
-                }
+        {
+            category: 'Basic: Features',
+            name: 'Update Nodes Data',
+            type: 'button',
+            style: {
+                text: 'NOD:\\n' + variablePath(inst, 'updateNodesProgress') + '\\n' + variablePath(inst, 'updateNodesDuration'),
+                size: '18',
+                color: combineRgb(255, 255, 255),
+                bgcolor: combineRgb(51, 0, 0)
             },
-            {
-                feedbackId: 'basicFeatureDataLoading',
-                options: { data: 'updateNodesData' },
-                style: {
-                    color: combineRgb(255, 255, 255),
-                    bgcolor: combineRgb(0, 0, 255)
+            steps: [
+                {
+                    down: [
+                        {
+                            actionId: 'basicLoadFeatureData',
+                            options: { data: 'updateNodesData' }
+                        }
+                    ]
                 }
-            }
-        ]
-    },
-    {
-        category: 'Basic: Features',
-        name: 'Update Rundowns Data',
-        type: 'button',
-        style: {
-            text: 'RUN:\\n' + variablePath(inst, 'updateRundownsProgress') + '\\n' + variablePath(inst, 'updateRundownsDuration'),
-            size: '18',
-            color: combineRgb(255, 255, 255),
-            bgcolor: combineRgb(51, 0, 0)
-        },
-        steps: [
-            {
-                down: [
-                    {
-                        actionId: 'basicLoadFeatureData',
-                        options: { data: 'updateRundownsData' }
+            ],
+            feedbacks: [
+                {
+                    feedbackId: 'basicFeatureSelected',
+                    options: { feature: 'nodes' },
+                    style: {
+                        color: combineRgb(255, 255, 255),
+                        bgcolor: combineRgb(0, 0, 51)
                     }
-                ]
-            }
-        ],
-        feedbacks: [
-            {
-                feedbackId: 'basicFeatureSelected',
-                options: { feature: 'rundowns' },
-                style: {
-                    color: combineRgb(255, 255, 255),
-                    bgcolor: combineRgb(0, 0, 51)
-                }
-            },
-            {
-                feedbackId: 'basicFeatureDataLoading',
-                options: { data: 'updateRundownsData' },
-                style: {
-                    color: combineRgb(255, 255, 255),
-                    bgcolor: combineRgb(0, 0, 255)
-                }
-            }
-        ]
-    },
-    {
-        category: 'Basic: Features',
-        name: 'Update Templates Data',
-        type: 'button',
-        style: {
-            text: 'TEM:\\n' + variablePath(inst, 'updateTemplatesProgress') + '\\n' + variablePath(inst, 'updateTemplatesDuration'),
-            size: '18',
-            color: combineRgb(255, 255, 255),
-            bgcolor: combineRgb(51, 0, 0)
-        },
-        steps: [
-            {
-                down: [
-                    {
-                        actionId: 'basicLoadFeatureData',
-                        options: { data: 'updateTemplatesData' }
+                },
+                {
+                    feedbackId: 'basicFeatureDataLoading',
+                    options: { data: 'updateNodesData' },
+                    style: {
+                        color: combineRgb(255, 255, 255),
+                        bgcolor: combineRgb(0, 0, 255)
                     }
-                ]
-            }
-        ],
-        feedbacks: [
-            {
-                feedbackId: 'basicFeatureSelected',
-                options: { feature: 'templates' },
-                style: {
-                    color: combineRgb(255, 255, 255),
-                    bgcolor: combineRgb(0, 0, 51)
                 }
+            ]
+        },
+        {
+            category: 'Basic: Features',
+            name: 'Update Rundowns Data',
+            type: 'button',
+            style: {
+                text: 'RUN:\\n' + variablePath(inst, 'updateRundownsProgress') + '\\n' + variablePath(inst, 'updateRundownsDuration'),
+                size: '18',
+                color: combineRgb(255, 255, 255),
+                bgcolor: combineRgb(51, 0, 0)
             },
-            {
-                feedbackId: 'basicFeatureDataLoading',
-                options: { data: 'updateTemplatesData' },
-                style: {
-                    color: combineRgb(255, 255, 255),
-                    bgcolor: combineRgb(0, 0, 255)
+            steps: [
+                {
+                    down: [
+                        {
+                            actionId: 'basicLoadFeatureData',
+                            options: { data: 'updateRundownsData' }
+                        }
+                    ]
                 }
-            }
-        ]
-    },
+            ],
+            feedbacks: [
+                {
+                    feedbackId: 'basicFeatureSelected',
+                    options: { feature: 'rundowns' },
+                    style: {
+                        color: combineRgb(255, 255, 255),
+                        bgcolor: combineRgb(0, 0, 51)
+                    }
+                },
+                {
+                    feedbackId: 'basicFeatureDataLoading',
+                    options: { data: 'updateRundownsData' },
+                    style: {
+                        color: combineRgb(255, 255, 255),
+                        bgcolor: combineRgb(0, 0, 255)
+                    }
+                }
+            ]
+        },
+        {
+            category: 'Basic: Features',
+            name: 'Update Templates Data',
+            type: 'button',
+            style: {
+                text: 'TEM:\\n' + variablePath(inst, 'updateTemplatesProgress') + '\\n' + variablePath(inst, 'updateTemplatesDuration'),
+                size: '18',
+                color: combineRgb(255, 255, 255),
+                bgcolor: combineRgb(51, 0, 0)
+            },
+            steps: [
+                {
+                    down: [
+                        {
+                            actionId: 'basicLoadFeatureData',
+                            options: { data: 'updateTemplatesData' }
+                        }
+                    ]
+                }
+            ],
+            feedbacks: [
+                {
+                    feedbackId: 'basicFeatureSelected',
+                    options: { feature: 'templates' },
+                    style: {
+                        color: combineRgb(255, 255, 255),
+                        bgcolor: combineRgb(0, 0, 51)
+                    }
+                },
+                {
+                    feedbackId: 'basicFeatureDataLoading',
+                    options: { data: 'updateTemplatesData' },
+                    style: {
+                        color: combineRgb(255, 255, 255),
+                        bgcolor: combineRgb(0, 0, 255)
+                    }
+                }
+            ]
+        },
     )
 
     const engines = engineSelection(inst, true)
 
     // append basic presets for mixer nodes
-    for (let mixer=0; mixer<3; mixer++) {
+    for (let mixer = 0; mixer < 3; mixer++) {
 
-        for (let channel=1; channel<=10; channel++) {
+        for (let channel = 1; channel <= 10; channel++) {
             presets.push({
                 category: `Basic: Mixer_${mixer}`,
                 name: `Set preview channel ${channel} on mixer node "Mixer_${mixer}"`,
@@ -464,30 +579,30 @@ export const getPresets = (inst) => {
         const shows = inst.data.shows
         const rundowns = inst.data.rundowns || {}
         const rundownToShowMap = inst.data.rundownToShowMap || {}
-        
+
         // Get unique show IDs that have rundowns (respects the rundown filter)
         const showIdsWithRundowns = new Set()
         for (const [rID, rundown] of Object.entries(rundowns)) {
             const showId = rundownToShowMap[rID] || rundown.showId || rundown.linoEngineId
             if (showId) showIdsWithRundowns.add(showId)
         }
-        
+
         // Create Launch Control presets for each show with rundowns
         for (const showId of showIdsWithRundowns) {
             const show = shows[showId]
             if (!show) continue
-            
+
             const showName = show.name || `Show ${showId}`
             const isActive = show.running || show.started
             const statusIcon = isActive ? '🟢' : '⚪'
-            
+
             // Get engine status icons for this show
             const engineIcons = getShowEngineIcons(show, inst.data.engines)
             const engineCount = show.renderers?.length || 0
-            
+
             // Category for this show's launch controls
             const launchCategory = `🚀 Launch Control: ${showName}`
-            
+
             // START button - Green, safe operation
             // Shows engine status icons when running
             presets.push({
@@ -518,7 +633,7 @@ export const getPresets = (inst) => {
                     }
                 ]
             })
-            
+
             // STOP button - Double-tap safety
             // First tap: ARMS (button turns RED with "TAP AGAIN!")
             // Second tap within 3s: EXECUTES stop
@@ -562,7 +677,7 @@ export const getPresets = (inst) => {
                     }
                 ]
             })
-            
+
             // STATUS button - Display-only, shows current state with engine status icons
             // Engine icons show connection status of each attached engine
             presets.push({
@@ -600,7 +715,7 @@ export const getPresets = (inst) => {
                 ]
             })
         }
-        
+
         inst.log('debug', `Generated Launch Control presets for ${showIdsWithRundowns.size} shows`)
     }
 
@@ -609,7 +724,7 @@ export const getPresets = (inst) => {
     if (inst.data.rundowns && Object.keys(inst.data.rundowns).length > 0) {
         let totalPresetsCount = 0
         const shows = inst.data.shows || {}
-        
+
         // loop over all rundowns
         for (const [rID, rundown] of Object.entries(inst.data.rundowns)) {
             // Get show info for category naming
@@ -618,10 +733,10 @@ export const getPresets = (inst) => {
             const showName = rundown.showName || (show ? show.name : 'Unknown')
             const isShowActive = show?.running || show?.started
             const showPrefix = isShowActive ? `🟢 ${showName}` : `⚪ ${showName}`
-            
+
             // Global rundown controls category
             const globalCategory = `${showPrefix} > ${rundown.name}: 🎬 Controls`
-            
+
             // Play Next buttons in global controls
             // These only gray out when show is stopped (no item-specific status)
             presets.push({
@@ -645,7 +760,7 @@ export const getPresets = (inst) => {
                 }],
                 feedbacks: [createShowStatusFeedback(rID)]  // Gray when show stopped
             })
-            
+
             presets.push({
                 category: globalCategory,
                 name: `Play Next → Preview`,
@@ -667,7 +782,7 @@ export const getPresets = (inst) => {
                 }],
                 feedbacks: [createShowStatusFeedback(rID)]  // Gray when show stopped
             })
-            
+
             // ALL OUT buttons (Program All Out / Preview All Out)
             presets.push({
                 category: globalCategory,
@@ -690,7 +805,7 @@ export const getPresets = (inst) => {
                 }],
                 feedbacks: [createShowStatusFeedback(rID)]  // Gray when show stopped
             })
-            
+
             presets.push({
                 category: globalCategory,
                 name: `ALL OUT ← Preview`,
@@ -712,7 +827,7 @@ export const getPresets = (inst) => {
                 }],
                 feedbacks: [createShowStatusFeedback(rID)]  // Gray when show stopped
             })
-            
+
             // CLEAR OUTPUT buttons (API v2.1.0 - single API call, more efficient)
             presets.push({
                 category: globalCategory,
@@ -735,7 +850,7 @@ export const getPresets = (inst) => {
                 }],
                 feedbacks: [createShowStatusFeedback(rID)]  // Gray when show stopped
             })
-            
+
             presets.push({
                 category: globalCategory,
                 name: `CLEAR ← Preview (v2.1)`,
@@ -758,7 +873,7 @@ export const getPresets = (inst) => {
                 feedbacks: [createShowStatusFeedback(rID)]  // Gray when show stopped
             })
             totalPresetsCount += 6  // 4 original + 2 clear output
-            
+
             // Add presets for each item - each item gets its own category
             // Combines BOTH playback controls AND Nodos form buttons
             if (rundown.items) {
@@ -776,10 +891,10 @@ export const getPresets = (inst) => {
                     const typeSuffix = typeLabel ? ` ${typeLabel}` : ''
                     // Create category per item: "ShowName > RundownName: [icon]ItemName [TYPE]"
                     const itemCategory = `${showPrefix} > ${rundown.name}: ${itemIcon}${itemLabel}${typeSuffix}`
-                    
+
                     // Shorten item name for button display (max ~10 chars)
                     const shortName = itemLabel.length > 10 ? itemLabel.substring(0, 9) + '…' : itemLabel
-                    
+
                     // === TOGGLE PLAYBACK CONTROLS (like RealityHub UI) ===
                     // Single button per channel: Play when idle, Out when playing
                     // Feedback layers (applied in order, last wins):
@@ -787,7 +902,7 @@ export const getPresets = (inst) => {
                     // 2. Item not active = dark base color (medium)
                     // 3. Item playing = bright color (highest)
                     // 4. Item offline = orange warning (overrides all)
-                    
+
                     // Preview Toggle (Green) - like RealityHub
                     // ▶ PVW (dark green) when idle → ■ PVW (bright green) when playing
                     presets.push({
@@ -810,13 +925,9 @@ export const getPresets = (inst) => {
                                 }
                             }]
                         }],
-                        feedbacks: [
-                            createShowStatusFeedback(rID),                              // Gray when show stopped
-                            createPreviewToggleFeedback(rID, iID, shortName),           // Bright green + ■ symbol when playing
-                            createItemOfflineFeedback(rID, iID)                         // Orange warning when offline
-                        ]
+                        feedbacks: getItemButtonFeedbacks(rID, iID, shortName, 'pvw')
                     })
-                    
+
                     // Program Toggle (Red) - like RealityHub
                     // ▶ PGM (dark red) when idle → ■ PGM (bright red) when playing
                     presets.push({
@@ -839,13 +950,9 @@ export const getPresets = (inst) => {
                                 }
                             }]
                         }],
-                        feedbacks: [
-                            createShowStatusFeedback(rID),                              // Gray when show stopped
-                            createProgramToggleFeedback(rID, iID, shortName),           // Bright red + ■ symbol when playing
-                            createItemOfflineFeedback(rID, iID)                         // Orange warning when offline
-                        ]
+                        feedbacks: getItemButtonFeedbacks(rID, iID, shortName, 'pgm')
                     })
-                    
+
                     // Continue (yellow - for animation continue)
                     // Active when item is playing in EITHER channel
                     presets.push({
@@ -868,17 +975,35 @@ export const getPresets = (inst) => {
                                 }
                             }]
                         }],
-                        feedbacks: [
-                            createShowStatusFeedback(rID),                              // Gray when show stopped
-                            createItemNotActiveFeedback(rID, iID, 255, 200, 0),         // Desaturate when idle
-                            createItemPlayingProgramFeedback(rID, iID),                 // Bright when in PGM
-                            createItemPlayingPreviewFeedback(rID, iID),                 // Bright when in PVW
-                            createItemOfflineFeedback(rID, iID)                         // Orange warning when offline
-                        ]
+                        feedbacks: getItemButtonFeedbacks(rID, iID, shortName, 'cont')
                     })
-                    
-                    totalPresetsCount += 3  // Preview Toggle, Program Toggle, Continue
-                    
+
+                    // Next (Gray/Blue - for animation next step)
+                    presets.push({
+                        category: itemCategory,
+                        name: `Next Step`,
+                        type: 'button',
+                        style: {
+                            text: `${shortName}\\n⏭ NEXT`,
+                            size: '14',
+                            color: combineRgb(255, 255, 255),
+                            bgcolor: combineRgb(60, 60, 60) // Dark gray base
+                        },
+                        steps: [{
+                            down: [{
+                                actionId: 'rundownItemNext',
+                                options: {
+                                    rundown: `r${rID}`,
+                                    [`r${rID}`]: `r${rID}_i${iID}`,
+                                    channel: '0' // Default to Program
+                                }
+                            }]
+                        }],
+                        feedbacks: getItemButtonFeedbacks(rID, iID, shortName, 'next')
+                    })
+
+                    totalPresetsCount += 4  // Preview Toggle, Program Toggle, Continue, Next
+
                     // === NODOS FORM BUTTONS (if item has buttons) ===
                     // These also get status-aware coloring
                     if (itemData.buttons && Object.keys(itemData.buttons).length > 0) {
@@ -887,7 +1012,7 @@ export const getPresets = (inst) => {
                             if (buttonLabel !== undefined) {
                                 // Truncate long labels for button display
                                 const shortLabel = buttonLabel.length > 12 ? buttonLabel.substring(0, 11) + '…' : buttonLabel
-                                
+
                                 presets.push({
                                     category: itemCategory,  // Same category as playback controls
                                     name: `${buttonLabel}`,  // Full name for tooltip
@@ -912,13 +1037,7 @@ export const getPresets = (inst) => {
                                             ]
                                         }
                                     ],
-                                    feedbacks: [
-                                        createShowStatusFeedback(rID),                              // Gray when show stopped
-                                        createItemNotActiveFeedback(rID, iID, 0, 153, 128),         // Desaturate when idle
-                                        createItemPlayingProgramFeedback(rID, iID),                 // Bright when in PGM
-                                        createItemPlayingPreviewFeedback(rID, iID),                 // Bright when in PVW
-                                        createItemOfflineFeedback(rID, iID)                         // Orange warning when offline
-                                    ]
+                                    feedbacks: getItemButtonFeedbacks(rID, iID, shortLabel, 'nodos')
                                 })
                                 totalPresetsCount++
                             }
@@ -959,7 +1078,7 @@ export const getPresets = (inst) => {
                             down: [
                                 {
                                     actionId: 'templateButtonPress',
-                                    options: { template: `r${rID}_i${item}`, [`r${rID}_i${item}`]:  `r${rID}_i${item}_b${button}` }
+                                    options: { template: `r${rID}_i${item}`, [`r${rID}_i${item}`]: `r${rID}_i${item}_b${button}` }
                                 }
                             ]
                         }
@@ -967,7 +1086,7 @@ export const getPresets = (inst) => {
                     feedbacks: [
                         {
                             feedbackId: 'templateButtonLabel',
-                            options: { template: `r${rID}_i${item}`, [`r${rID}_i${item}`]:  `r${rID}_i${item}_b${button}` },
+                            options: { template: `r${rID}_i${item}`, [`r${rID}_i${item}`]: `r${rID}_i${item}_b${button}` },
                             style: {
                                 color: combineRgb(255, 255, 255),
                                 bgcolor: combineRgb(0, 0, 51)

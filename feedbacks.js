@@ -795,6 +795,207 @@ function createFeedbacks(inst) {
                 return getItemType(inst, rundownId, itemId) === 'md'
             }
         }
+
+        // --- NEW ONLINE STATUS FEEDBACKS ---
+
+        feedbacks.itemOnlineMD = {
+            type: 'boolean',
+            name: 'Item Status: MD Online (Green LED)',
+            description: 'Activates when an MD item is ONLINE. Use to show a bright green indicator.',
+            options: createItemSelectionOptions(),
+            defaultStyle: {
+                color: combineRgb(255, 255, 255),
+                bgcolor: combineRgb(34, 197, 94)  // Bright Green
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return false
+
+                return getItemType(inst, rundownId, itemId) === 'md' && isItemOnline(inst, rundownId, itemId)
+            }
+        }
+
+        feedbacks.itemOnlineVS = {
+            type: 'boolean',
+            name: 'Item Status: VS Online (Blue LED)',
+            description: 'Activates when a VS item is ONLINE. Use to show a bright blue indicator.',
+            options: createItemSelectionOptions(),
+            defaultStyle: {
+                color: combineRgb(255, 255, 255),
+                bgcolor: combineRgb(37, 99, 235)  // Bright Blue
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return false
+
+                return getItemType(inst, rundownId, itemId) === 'vs' && isItemOnline(inst, rundownId, itemId)
+            }
+        }
+
+        feedbacks.itemStatusOffline = {
+            type: 'boolean',
+            name: 'Item Status: Offline (Rundown/Show Off)',
+            description: 'Activates when an item is OFFLINE (engine stopped or asset not loaded).',
+            options: createItemSelectionOptions(),
+            defaultStyle: {
+                color: combineRgb(150, 150, 150),
+                bgcolor: combineRgb(40, 40, 40)   // Dark gray
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return false
+
+                return !isItemOnline(inst, rundownId, itemId)
+            }
+        }
+
+        feedbacks.itemChannelUnavailable = {
+            type: 'boolean',
+            name: 'Item Status: Channel Unavailable',
+            description: 'Activates when a specific channel (Preview or Program) is UNAVAILABLE for an item.',
+            options: [
+                ...createItemSelectionOptions(),
+                {
+                    type: 'dropdown',
+                    label: 'Channel:',
+                    id: 'channel',
+                    default: 'program',
+                    choices: [
+                        { id: 'program', label: 'Program' },
+                        { id: 'preview', label: 'Preview' }
+                    ]
+                }
+            ],
+            defaultStyle: {
+                color: combineRgb(100, 100, 100),
+                bgcolor: combineRgb(30, 30, 30)   // Very dark gray
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                const channel = event.options.channel
+                if (!rundownId || !itemId || !channel) return false
+
+                const status = getItemStatus(inst, rundownId, itemId)
+                if (!status) return false
+
+                return status[channel] === 'Unavailable'
+            }
+        }
+
+        feedbacks.itemProgramAvailable = {
+            type: 'boolean',
+            name: 'Item Status: Program Available (Dim Red)',
+            description: 'Activates when an item is available for Program (but not playing). Use to show desaturated red.',
+            options: createItemSelectionOptions(),
+            defaultStyle: {
+                color: combineRgb(200, 200, 200),
+                bgcolor: combineRgb(90, 25, 25)  // Desaturated Red
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return false
+
+                const status = getItemStatus(inst, rundownId, itemId)
+                return status?.program === 'Available'
+            }
+        }
+
+        feedbacks.itemPreviewAvailable = {
+            type: 'boolean',
+            name: 'Item Status: Preview Available (Dim Green)',
+            description: 'Activates when an item is available for Preview (but not playing). Use to show desaturated green.',
+            options: createItemSelectionOptions(),
+            defaultStyle: {
+                color: combineRgb(200, 200, 200),
+                bgcolor: combineRgb(20, 70, 40)   // Desaturated Green
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return false
+
+                const status = getItemStatus(inst, rundownId, itemId)
+                return status?.preview === 'Available'
+            }
+        }
+
+        // --- DISTINCT CONT/NEXT FUNCTIONAL FEEDBACKS ---
+
+        feedbacks.itemContAvailable = {
+            type: 'boolean',
+            name: 'Item Status: CONT Available (Dim Yellow)',
+            options: createItemSelectionOptions(),
+            defaultStyle: {
+                color: combineRgb(200, 200, 200),
+                bgcolor: combineRgb(100, 80, 0)  // Dark Amber
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return false
+
+                const status = getItemStatus(inst, rundownId, itemId)
+                // Available if playing in any channel or ready to play
+                return status?.isActive || isItemOnline(inst, rundownId, itemId)
+            }
+        }
+
+        feedbacks.itemNextAvailable = {
+            type: 'boolean',
+            name: 'Item Status: NEXT Available (Dim Blue)',
+            options: createItemSelectionOptions(),
+            defaultStyle: {
+                color: combineRgb(200, 200, 200),
+                bgcolor: combineRgb(10, 40, 80)  // Dark Blue
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return false
+
+                return isItemOnline(inst, rundownId, itemId)
+            }
+        }
+
+        feedbacks.itemContActive = {
+            type: 'boolean',
+            name: 'Item Status: CONT Active (Bright Yellow/Amber)',
+            options: createItemSelectionOptions(),
+            defaultStyle: {
+                color: combineRgb(0, 0, 0),
+                bgcolor: combineRgb(255, 200, 0) // Bright Yellow
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return false
+
+                return isItemActive(inst, rundownId, itemId)
+            }
+        }
+
+        feedbacks.itemNextActive = {
+            type: 'boolean',
+            name: 'Item Status: NEXT Active (Bright Cyan/Blue)',
+            options: createItemSelectionOptions(),
+            defaultStyle: {
+                color: combineRgb(255, 255, 255),
+                bgcolor: combineRgb(0, 150, 255) // Bright Cyan
+            },
+            callback: (event) => {
+                const rundownId = event.options.rundown
+                const itemId = event.options[`item_${rundownId}`]
+                if (!rundownId || !itemId) return false
+
+                return isItemActive(inst, rundownId, itemId)
+            }
+        }
+
     }
 
     // template feedbacks

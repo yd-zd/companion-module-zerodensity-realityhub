@@ -1,5 +1,58 @@
 # RealityHub Companion Module - Development Logbook
 
+## 2026-01-23: Unified Broadcast Controls & Next Action (v2.2.0)
+
+### Professional Broadcast Standards: Red/Green/Yellow/Blue Logic
+
+**Problem:** 
+- Rundown item buttons lacked visual consistency with professional hardware controllers.
+- Operators couldn't distinguish between "Available" vs "Playing" states at a glance.
+- PGM/PVW colors were often used interchangeably, violating broadcasting norms.
+
+**Solution:**
+Implemented a unified, priority-aware feedback system that strictly adheres to broadcasting standards:
+- **PGM (On-Air):** Always RED. Dim red when available, Bright red when live.
+- **PVW (Preview):** Always GREEN. Dim green when available, Bright green when in preview.
+- **CONT (Continue):** Always YELLOW/AMBER. Dim when ready, Bright when active.
+- **NEXT (Next Step):** Always BLUE/CYAN. Dim when ready, Bright when active.
+
+### Features
+
+**1. Unified Button State Logic**
+- **Show Down:** Buttons are grayed out when the associated show is stopped.
+- **Item Offline:** Dark gray background if the item is not ready on the engine.
+- **Channel Availability:** Buttons display a `❌` symbol if a specific channel is `Unavailable`.
+- **Function-Aware Styling:**
+  - **PGM Toggle:** Dim Red → Bright Red (`■ PGM`).
+  - **PVW Toggle:** Dim Green → Bright Green (`■ PVW`).
+  - **Continue:** Dim Amber → Bright Yellow.
+  - **Next Step:** Dark Blue → Bright Cyan.
+
+**2. New Action: Next Item Step**
+Added support for the RealityHub "Next Step" command:
+- **API Action:** `rundownItemNext` → `PUT /lino/rundown/{showId}/next/{itemId}/{channel}`.
+- Used for advancing animation cues or steps within a specific rundown item.
+- Operates on the Program channel by default but supports channel selection.
+
+**3. Availability-Aware Action Blocking**
+Enhanced actions (`Play`, `Toggle`, `Continue`, `Next`) to actively block execution if the target channel is marked as `Unavailable` in the RealityHub rundown, preventing out-of-sync operations.
+
+**4. Nodos Form Button Independence**
+Nodos form (custom property) buttons now ignore item availability/online status. This allows operators to modify parameters (text, values) even if the item is not live or ready, matching the flexible nature of RealityHub's VS items. They still dim if the Show is stopped.
+
+### Technical Implementation
+- **`feedbacks.js`**: Added `itemChannelUnavailable`, `itemProgramAvailable`, `itemPreviewAvailable`, `itemContAvailable`, `itemNextAvailable`, `itemContActive`, and `itemNextActive`.
+- **`presets.js`**: Re-architected `getItemButtonFeedbacks` into a centralized priority-ordered stack.
+- **`actions.js`**: Updated optimistic update logic and added channel availability checks to prevent invalid commands. Added `rundownItemNext`.
+
+### Files Changed
+- `actions.js` - Added `next` action and availability blocking logic.
+- `feedbacks.js` - Added 7 new broadcast/functional feedback types.
+- `presets.js` - Centralized feedback stack logic and added `NEXT` preset.
+- `package.json` - Version bumped to 2.2.0.
+
+---
+
 ## 2026-01-15: RealityHub API v2.1.0+191 Adaptation (v2.1.15)
 
 ### Breaking API Change: `/lino/engines` → `/lino/shows`
