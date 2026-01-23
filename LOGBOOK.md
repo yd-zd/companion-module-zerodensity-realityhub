@@ -1,6 +1,6 @@
 # RealityHub Companion Module - Development Logbook
 
-## 2026-01-23: Unified Broadcast Controls & Next Action (v2.2.0)
+## 2026-01-23: Unified Broadcast Controls & Next Action (v2.1.18)
 
 ### Professional Broadcast Standards: Red/Green/Yellow/Blue Logic
 
