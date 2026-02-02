@@ -475,7 +475,6 @@ function createFeedbacks(inst) {
 
                                 compareProperty.normalValue = event.options[inputKey]
                                 compareProperty.safeValue = sString(event.options[inputKey])
-                                // console.log(engine, keys, storedProperty, compareProperty)
                             }
                             else if (keys.length === 2 && event.options[inputKey] !== undefined) {
                                 // if (compareProperty[keys[0]] === undefined) compareProperty[keys[0]] = {}

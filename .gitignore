@@ -1,6 +1,4 @@
 /node_modules
 /pkg
 /pkg.tgz
-*.yaml
-yarn.lock
 *.tgz
