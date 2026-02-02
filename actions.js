@@ -841,7 +841,8 @@ function createActions(inst) {
             const itemId = parts[1].substring(1) // Remove 'i' prefix
 
             const rundown = inst.data.rundowns[rundownId]
-            const showId = rundown?.showId || rundown?.linoEngineId
+            const map = inst.data.rundownToShowMap || {}
+            const showId = rundown?.showId ?? rundown?.linoEngineId ?? map[rundownId] ?? map[String(rundownId)]
             const show = inst.data.shows?.[showId]
             const channel = event.options.channel || '0'
 
@@ -1086,19 +1087,20 @@ function createActions(inst) {
 
                 const rundownId = rundownSelection.substring(1) // Remove 'r' prefix
                 const rundown = inst.data.rundowns[rundownId]
-                const showId = rundown?.showId || rundown?.linoEngineId
+                // Use rundown's showId, or fallback to rundownToShowMap (authoritative from engines)
+                const map = inst.data.rundownToShowMap || {}
+                const showId = rundown?.showId ?? rundown?.linoEngineId ?? map[rundownId] ?? map[String(rundownId)]
                 const show = inst.data.shows?.[showId]
                 const channel = event.options.channel || '0'
                 const channelName = channel === '1' ? 'Preview' : 'Program'
 
                 if (!showId) {
-                    inst.log('error', 'Cannot play next: No Show ID for rundown')
+                    inst.log('error', `Cannot play next: No Show ID for rundown ${rundownId}. Check rundownToShowMap.`)
                     return
                 }
 
                 const endpoint = `lino/rundown/${showId}/playnext/${channel}`
-
-                inst.log('debug', `Playing next item to ${channelName}: Show="${show?.name}"`)
+                inst.log('debug', `Play next → ${channelName}: showId=${showId}, rundownId=${rundownId}, endpoint=${endpoint}`)
 
                 const response = await inst.PUT(endpoint)
                 if (response === null) {
@@ -1125,13 +1127,14 @@ function createActions(inst) {
 
                 const rundownId = rundownSelection.substring(1) // Remove 'r' prefix
                 const rundown = inst.data.rundowns[rundownId]
-                const showId = rundown?.showId || rundown?.linoEngineId
+                const map = inst.data.rundownToShowMap || {}
+                const showId = rundown?.showId ?? rundown?.linoEngineId ?? map[rundownId] ?? map[String(rundownId)]
                 const show = inst.data.shows?.[showId]
                 const channel = event.options.channel || '0'
                 const channelName = channel === '1' ? 'Preview' : 'Program'
 
                 if (!showId) {
-                    inst.log('error', 'Cannot all-out: No Show ID for rundown')
+                    inst.log('error', `Cannot all-out: No Show ID for rundown ${rundownId}. Check rundownToShowMap.`)
                     return
                 }
 
@@ -1184,19 +1187,19 @@ function createActions(inst) {
 
                 const rundownId = rundownSelection.substring(1) // Remove 'r' prefix
                 const rundown = inst.data.rundowns[rundownId]
-                const showId = rundown?.showId || rundown?.linoEngineId
+                const map = inst.data.rundownToShowMap || {}
+                const showId = rundown?.showId ?? rundown?.linoEngineId ?? map[rundownId] ?? map[String(rundownId)]
                 const channel = event.options.channel || '0'
                 const channelName = channel === '1' ? 'Preview' : 'Program'
 
                 if (!showId) {
-                    inst.log('error', 'Cannot clear output: No Show ID for rundown')
+                    inst.log('error', `Cannot clear output: No Show ID for rundown ${rundownId}. Check rundownToShowMap.`)
                     return
                 }
 
-                inst.log('info', `Clear Output: Clearing ${channelName} channel for Show ${showId}`)
-
-                // Use the new clear endpoint (API v2.1.0)
                 const endpoint = `lino/rundown/${showId}/clear/${channel}`
+                inst.log('debug', `Clear output ${channelName}: showId=${showId}, rundownId=${rundownId}, endpoint=${endpoint}`)
+
                 try {
                     const response = await inst.PUT(endpoint)
                     if (response !== null) {

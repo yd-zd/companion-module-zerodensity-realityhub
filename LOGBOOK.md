@@ -1,5 +1,31 @@
 # RealityHub Companion Module - Development Logbook
 
+## 2026-02-02: Play Next / Clear Preview / Next Program Show ID Fix
+
+### Bug: Next Preview, Clear Preview, Next Program Buttons Not Working
+
+**Problem:**
+"Next preview", "Clear preview", and "Next program" (and other rundown-level actions: Play Next, Clear Output, All Out) did nothing when pressing Companion buttons, despite correct config (Rundown filter BCRundown, Show 169 "122" RUNNING with rundown 300, Rundown-to-Show map `{"300":"169"}`).
+
+**Root cause:**
+Rundown-level actions (rundownPlayNext, clearOutput, rundownAllOut) and item-level actions (via parseRundownItemSelection) resolved `showId` only from the rundown object (`rundown?.showId || rundown?.linoEngineId`). When the same rundown is loaded on multiple shows, or when cached rundown data did not have `showId` set (e.g. after isEqual skip or legacy data), `showId` could be undefined and the action would log "Cannot play next: No Show ID for rundown" and return without calling the API.
+
+**Solution:**
+1. **Fallback to rundownToShowMap:** All actions that need a showId for a rundown now resolve it as:
+   `rundown?.showId ?? rundown?.linoEngineId ?? rundownToShowMap[rundownId] ?? rundownToShowMap[String(rundownId)]`
+   so the authoritative map from engines (built from `/lino/shows` loadedRundownsInfo) is used when the rundown object lacks showId.
+2. **parseRundownItemSelection** updated to use the same fallback so Play/Out/Continue/Next/Toggle item actions also get the correct showId.
+3. **Debug logging** added for play next and clear output: log `showId`, `rundownId`, and `endpoint` so logs show exactly which API call is made.
+
+**Files changed:**
+- `actions.js` – showId fallback in rundownPlayNext, rundownAllOut, clearOutput, and parseRundownItemSelection; debug logs for play next and clear output.
+
+**Verification:**
+- With Rundown-to-Show map `{"300":"169"}`, actions now call e.g. `PUT .../lino/rundown/169/playnext/1` and `PUT .../lino/rundown/169/clear/1` using showId 169.
+- Enable Companion debug logs to see lines like: `Play next → Preview: showId=169, rundownId=300, endpoint=lino/rundown/169/playnext/1`.
+
+---
+
 ## 2026-01-23: Unified Broadcast Controls & Next Action (v2.1.18)
 
 ### Professional Broadcast Standards: Red/Green/Yellow/Blue Logic
