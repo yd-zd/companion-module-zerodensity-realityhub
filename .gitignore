@@ -2,3 +2,5 @@
 /pkg
 /pkg.tgz
 *.tgz
+package-lock.json
+rest-api-gitbook.yaml
