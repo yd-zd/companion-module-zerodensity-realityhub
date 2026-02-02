@@ -203,7 +203,7 @@ Understanding this architecture is critical for working with the API:
 │  Shows (GET /api/rest/v1/launcher)                                  │
 │  IDs: 60, 92, 96... (e.g., "Main Show", "Studio B")                 │
 │                                                                     │
-│  Shows with Rundowns (GET /lino/shows) - loadedRundownsInfo        │
+│  Shows with Rundowns (GET /lino/shows) - loadedRundownsInfo         │
 │      All Lino API {showId} parameters require SHOW IDs!             │
 │                                                                     │
 │    └── Rundowns (loaded on Shows)                                   │
@@ -394,6 +394,37 @@ item.status = {
 - ✅ Works without status field (older API versions)
 - ✅ Graceful degradation: assume not playing if no status
 - ✅ Status feedbacks return false when status unavailable
+
+### Testing / Verification
+
+Test scenarios:
+
+1. **Basic Status Display** – Button with itemPlayingInProgram feedback turns red when item plays from Reality Hub UI.
+2. **Multi-Channel** – Button with PGM + PVW feedbacks shows green in Preview, red in Program (priority).
+3. **Status Polling** – With global poll interval, button reflects status within one poll cycle after change.
+4. **Backward Compatibility** – With API that does not return status, module runs normally; status feedbacks false.
+
+### Performance (Polling)
+
+| Poll Interval | Recommendation |
+|--------------|----------------|
+| 1s | High load, not recommended |
+| 5s | ✅ Recommended for active control |
+| 10s | ✅ Recommended for monitoring |
+| 30+ s | Passive monitoring |
+
+Status adds ~200 bytes per item; memory impact negligible. Optimization: status is refreshed as part of chained rundown/item updates (see v2.1.5).
+
+### Troubleshooting
+
+- **Feedbacks not updating** – Ensure show is running and global poll is active; status comes from items API on each rundown refresh.
+- **Status always "not playing"** – Confirm API returns `status` on items (RealityHub v2.1.0+); check logs for received items.
+- **Buttons out of sync** – Reduce global poll interval or trigger action (refresh follows run).
+
+### Future Enhancements (from implementation guide)
+
+- WebSocket-based status updates (when API supports it).
+- Expose status as Companion variables (e.g. `item_X_status_pgm`).
 
 ---
 
