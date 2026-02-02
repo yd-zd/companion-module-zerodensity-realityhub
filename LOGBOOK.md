@@ -2,28 +2,57 @@
 
 ## 2026-02-02: All Out Skips VS/Nodos Items
 
-### Bug: All Out Causes VS Items to Lock in Playing State
+### Case: Nodos Form Items Lock in Playing State When Using "All Program Out"
 
-**Problem:**
-When pressing "All Out Program" or "All Out Preview", the action loops through ALL items and sends `PUT /lino/rundown/{showId}/out/{itemId}/{channel}`. For **VS (Nodos) items**, which are forms with custom buttons rather than playable graphics, sending the `out` command can:
-- Cause the item to start playing unexpectedly
-- Lock the item in a "Playing" state
-- Leave the item stuck (e.g., "Video Control" item in screenshot)
+**Context:**
+The yellow "All Program Out" / "All Preview Out" buttons are a workaround that outs all rundown items one by one (`PUT /lino/rundown/{showId}/out/{itemId}/{channel}` for each item). RealityHub rundowns can contain two item types from the API:
+- **MD (Motion Design)** – self-contained graphics/animations (e.g. ZD_Butterfly, LT_NameTag, FS_Formation)
+- **VS (Nodos)** – form items with custom elements (buttons, inputs, etc.), e.g. "Video Control" with a Nodos camera icon
+
+**Symptom:**
+When pressing "All Program Out", Nodos/VS items (e.g. "Video Control") would:
+- Start playing or react unexpectedly to the `out` command
+- Lock into a "Playing" state with the Out button showing bright red
+- Remain stuck in that state
+
+MD items were taken out correctly; only VS items exhibited the problem.
 
 **Root cause:**
-VS items (`itemType: 'vs'`) are fundamentally different from MD items (`itemType: 'md'`):
-- **MD items**: Self-contained graphics/animations that respond to play/out commands
-- **VS items**: Forms with buttons, inputs, controls; play/out only works if user mapped functions to those buttons
+VS items are not controlled like MD items:
+- **MD items** respond to direct play/out API calls as normal playback targets.
+- **VS items** are forms; their play/out behavior depends on functions mapped to their Play/Out PGM/PVW buttons in RealityHub. Sending a direct `out` command to a VS item is not part of that flow and can put the item into an inconsistent or stuck state (likely RealityHub/server-side behavior for that item type).
 
-**Solution:**
-`rundownAllOut` now filters items by `itemType` and **skips VS items**:
-- Only sends `out` command to items where `itemType !== 'vs'`
-- Logs how many VS items were skipped vs. how many MD items were processed
+**Fix:**
+`rundownAllOut` was updated to **skip VS items** and only send `out` to MD items:
+
+1. Before looping, items are filtered by `itemType`: only items with `itemType !== 'vs'` are included.
+2. The loop sends `PUT .../out/{itemId}/{channel}` only for those MD items.
+3. Logging was added so the user sees how many MD items were processed and how many VS items were skipped, e.g.:
+   - `All Out Program: Stopping 20 MD items in "BCRundown" (skipping 5 VS/Nodos items)`
+   - If the rundown has only VS items: `All Out Program: No MD items to out (25 VS/Nodos items skipped)`.
 
 **Files changed:**
-- `actions.js` – `rundownAllOut` filters out VS items before sending out commands
+- `actions.js` – In `rundownAllOut`, filter `rundown.items` by `itemType !== 'vs'` and only call the out endpoint for the filtered list; adjust logging to report MD vs VS counts.
 
-**Note:** The `clearOutput` action (single API call `PUT /lino/rundown/{showId}/clear/{channel}`) may be safer as it's handled server-side by RealityHub. The All Out workaround is only needed when `clearOutput` isn't available or doesn't work as expected.
+**Recommendation:**
+Prefer the **Clear Output** action (single `PUT /lino/rundown/{showId}/clear/{channel}`) when available; it is handled server-side and clears the channel without iterating items. Use "All Out" only when Clear Output is not available or does not meet the use case.
+
+---
+
+## 2026-02-02: No Per-Item Next Button (Match RealityHub UI) (v2.1.19)
+
+**Design:**
+In RealityHub, rundown **item rows** have Play, Out (PGM/PVW), and Continue only — they do **not** have a Next button per item. The **Next** button exists only at the **rundown controls** level (Preview/Program section: Play, Stop, Continue, Next).
+
+**Change:**
+Removed the per-item "Next Step" preset so each item category now has only three playback buttons: Preview Toggle, Program Toggle, and Continue. Next is available only in 🎬 Controls via "Play Next → Program" and "Play Next → Preview".
+
+**Files changed:**
+- `presets.js` – Removed the per-item Next Step preset; `totalPresetsCount` per item is 3 (was 4).
+- `package.json` – Version 2.1.18 → 2.1.19.
+- `companion/manifest.json` – Version 2.1.19.
+
+**Note:** The `rundownItemNext` action and related feedbacks remain available for custom mappings; they are no longer used by default presets.
 
 ---
 

@@ -978,31 +978,10 @@ export const getPresets = (inst) => {
                         feedbacks: getItemButtonFeedbacks(rID, iID, shortName, 'cont')
                     })
 
-                    // Next (Gray/Blue - for animation next step)
-                    presets.push({
-                        category: itemCategory,
-                        name: `Next Step`,
-                        type: 'button',
-                        style: {
-                            text: `${shortName}\\n⏭ NEXT`,
-                            size: '14',
-                            color: combineRgb(255, 255, 255),
-                            bgcolor: combineRgb(60, 60, 60) // Dark gray base
-                        },
-                        steps: [{
-                            down: [{
-                                actionId: 'rundownItemNext',
-                                options: {
-                                    rundown: `r${rID}`,
-                                    [`r${rID}`]: `r${rID}_i${iID}`,
-                                    channel: '0' // Default to Program
-                                }
-                            }]
-                        }],
-                        feedbacks: getItemButtonFeedbacks(rID, iID, shortName, 'next')
-                    })
+                    // No per-item Next button: RealityHub item rows have Play/Out PGM-PVW and Continue only.
+                    // Next exists at rundown level in 🎬 Controls (Play Next → Program / Play Next → Preview).
 
-                    totalPresetsCount += 4  // Preview Toggle, Program Toggle, Continue, Next
+                    totalPresetsCount += 3  // Preview Toggle, Program Toggle, Continue (no per-item Next)
 
                     // === NODOS FORM BUTTONS (if item has buttons) ===
                     // These also get status-aware coloring
