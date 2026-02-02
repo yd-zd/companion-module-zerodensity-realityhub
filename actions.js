@@ -1143,12 +1143,28 @@ function createActions(inst) {
                     return
                 }
 
-                inst.log('info', `All Out ${channelName}: Stopping all ${Object.keys(rundown.items).length} items in "${rundown.name}"`)
+                // Filter to only MD (Motion Design) items - skip VS (Nodos) items
+                // VS items are forms with custom buttons; sending out command can cause issues
+                const mdItems = Object.entries(rundown.items).filter(([id, item]) => {
+                    // Skip VS items (Nodos forms) - they don't support direct play/out
+                    if (item.itemType === 'vs') return false
+                    return true
+                })
 
-                // Call out for each item in the rundown
+                const totalItems = Object.keys(rundown.items).length
+                const skippedVsItems = totalItems - mdItems.length
+
+                if (mdItems.length === 0) {
+                    inst.log('info', `All Out ${channelName}: No MD items to out (${skippedVsItems} VS/Nodos items skipped)`)
+                    return
+                }
+
+                inst.log('info', `All Out ${channelName}: Stopping ${mdItems.length} MD items in "${rundown.name}" (skipping ${skippedVsItems} VS/Nodos items)`)
+
+                // Call out for each MD item in the rundown
                 let successCount = 0
                 let failCount = 0
-                for (const itemId of Object.keys(rundown.items)) {
+                for (const [itemId, item] of mdItems) {
                     const endpoint = `lino/rundown/${showId}/out/${itemId}/${channel}`
                     try {
                         const response = await inst.PUT(endpoint)

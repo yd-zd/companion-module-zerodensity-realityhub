@@ -1,5 +1,32 @@
 # RealityHub Companion Module - Development Logbook
 
+## 2026-02-02: All Out Skips VS/Nodos Items
+
+### Bug: All Out Causes VS Items to Lock in Playing State
+
+**Problem:**
+When pressing "All Out Program" or "All Out Preview", the action loops through ALL items and sends `PUT /lino/rundown/{showId}/out/{itemId}/{channel}`. For **VS (Nodos) items**, which are forms with custom buttons rather than playable graphics, sending the `out` command can:
+- Cause the item to start playing unexpectedly
+- Lock the item in a "Playing" state
+- Leave the item stuck (e.g., "Video Control" item in screenshot)
+
+**Root cause:**
+VS items (`itemType: 'vs'`) are fundamentally different from MD items (`itemType: 'md'`):
+- **MD items**: Self-contained graphics/animations that respond to play/out commands
+- **VS items**: Forms with buttons, inputs, controls; play/out only works if user mapped functions to those buttons
+
+**Solution:**
+`rundownAllOut` now filters items by `itemType` and **skips VS items**:
+- Only sends `out` command to items where `itemType !== 'vs'`
+- Logs how many VS items were skipped vs. how many MD items were processed
+
+**Files changed:**
+- `actions.js` – `rundownAllOut` filters out VS items before sending out commands
+
+**Note:** The `clearOutput` action (single API call `PUT /lino/rundown/{showId}/clear/{channel}`) may be safer as it's handled server-side by RealityHub. The All Out workaround is only needed when `clearOutput` isn't available or doesn't work as expected.
+
+---
+
 ## 2026-02-02: Play Next / Clear Preview / Next Program Show ID Fix
 
 ### Bug: Next Preview, Clear Preview, Next Program Buttons Not Working
