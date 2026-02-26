@@ -1,85 +1,55 @@
-# Maintainer Rules and Release Process
+# MAINTAINERS
 
-This document defines the default workflow for maintaining this Companion module.
+This fork follows the Bitfocus Companion module workflow and quality gates.
 
-## 1) Branching strategy
+## Maintainers
 
-- Use `main` as the single integration branch.
-- Do **not** keep a permanent branch for every patch version (`2.1.21`, `2.1.22`, ...).
-- Create short-lived branches per change:
-  - `feat/<topic>` for features
-  - `fix/<topic>` for bug fixes
-  - `chore/<topic>` for tooling/docs/CI
-- Merge via Pull Request only (no direct pushes to `main`).
+| Name | GitHub | Email | Role |
+| --- | --- | --- | --- |
+| Yunus Dede | [@yd-zd](https://github.com/yd-zd) | yunusdede@outlook.com | Primary maintainer (fork owner) |
+| Jan Gorgen | N/A | jg@goergen-medien.de | Original module maintainer |
 
-## 2) Versioning rules
+## Supported Branch Model
 
-- Follow SemVer:
-  - `PATCH` for bug fixes/internal improvements
-  - `MINOR` for backward-compatible features
-  - `MAJOR` for breaking changes
-- Keep version in sync in both files:
-  - `package.json`
-  - `companion/manifest.json`
-- Release tags must be `vX.Y.Z` (for example: `v2.1.21`).
+- `main` is the only long-lived branch.
+- Use short-lived topic branches:
+  - `feat/<topic>`
+  - `fix/<topic>`
+  - `chore/<topic>`
+- Merge via pull requests only.
 
-## 3) CI and release flow
+## Required Checks Before Merge
 
-- Every PR must pass:
-  - module checks
-  - tests (`yarn test`)
-  - build (`yarn build`)
-- Merging to `main` triggers release automation:
-  - build artifact (`*.tgz`)
-  - GitHub Release creation
-  - auto-generated release notes
-- Release source of truth is the version in `package.json`.
-
-## 4) Testing policy
-
-- New behavior changes require tests when practical.
-- Minimum local verification before opening PR:
+- `Companion Module Checks` workflow passes.
+- `Node CI` workflow passes:
   - `yarn test`
-  - `yarn build`
-- Keep tests deterministic and fast (avoid network-dependent tests in CI by default).
+  - `yarn package`
+- `yarn lint` is recommended locally and should be improved gradually.
 
-## 5) Compatibility and upgrades
+## Versioning Policy
 
-- If config/action/feedback structure changes, add/update `upgradeScripts` in `upgrades.js`.
-- Preserve existing user workflows whenever possible.
-- Call out any behavior change in PR description and release notes.
+- SemVer is required:
+  - `PATCH`: fixes/tooling/docs with no behavior break
+  - `MINOR`: backward-compatible new features
+  - `MAJOR`: breaking changes
+- `package.json` is the release version source of truth.
+- `companion/manifest.json` stays at `0.0.0` and is handled at package build time.
+- Git tags must use `vX.Y.Z`.
 
-## 6) When to use maintenance branches
+## Release Procedure
 
-Use long-lived maintenance branches only when supporting parallel release lines, for example:
+1. Update code and tests on a topic branch.
+2. Run local gates:
+   - `yarn test`
+   - `yarn package`
+3. Bump version in `package.json`.
+4. Merge pull request to `main`.
+5. Create and push tag `vX.Y.Z`:
+   - `git tag vX.Y.Z`
+   - `git push origin vX.Y.Z`
+6. GitHub Actions `Release` workflow builds `.tgz` and publishes the GitHub Release.
 
-- `main` for upcoming `2.2.x`
-- `release/2.1` for critical backports to `2.1.x`
+## Upgrade Script Policy
 
-If this is not needed, stay with trunk-based flow on `main`.
-
-## 7) GitHub repository rules (recommended settings)
-
-Configure branch protection on `main`:
-
-- Require pull request before merging
-- Require status checks to pass before merging
-- Require branches to be up to date before merging
-- Require conversation resolution before merging
-- Restrict direct pushes to `main`
-- Include administrators in protections
-
-Optional but useful:
-
-- Auto-delete head branches after merge
-- Squash merge as default merge strategy
-- Linear history enabled
-
-## 8) Standard release checklist
-
-1. Create branch from latest `main`
-2. Implement change + tests
-3. Bump version in `package.json` and `companion/manifest.json`
-4. Run `yarn test` and `yarn build`
-5. Open PR and merge after checks pass
-6. Confirm GitHub Release and artifact were created
+- If config/action/feedback IDs or structures change, update `upgrades.js`.
+- Keep existing user configurations compatible whenever possible.

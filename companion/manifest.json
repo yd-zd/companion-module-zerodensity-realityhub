@@ -1,15 +1,20 @@
 {
+	"$schema": "../node_modules/@companion-module/base/assets/manifest.schema.json",
 	"id": "zerodensity-realityhub",
 	"name": "Zero Density: RealityHub",
 	"shortname": "RealityHub",
 	"description": "Control Zero Density RealityHub 2.1 for virtual production and broadcast graphics",
-	"version": "2.1.23",
+	"version": "0.0.0",
 	"license": "MIT",
-	"repository": "https://github.com/bitfocus/companion-module-zerodensity-realityhub",
-	"bugs": "https://github.com/bitfocus/companion-module-zerodensity-realityhub/issues",
+	"repository": "git+https://github.com/yd-zd/companion-module-zerodensity-realityhub.git",
+	"bugs": "https://github.com/yd-zd/companion-module-zerodensity-realityhub/issues",
 	"maintainers": [
 		{
-			"name": "Jan Görgen",
+			"name": "Yunus Dede",
+			"email": "yunusdede@outlook.com"
+		},
+		{
+			"name": "Jan Gorgen",
 			"email": "jg@goergen-medien.de"
 		}
 	],
