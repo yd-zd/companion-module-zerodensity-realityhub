@@ -3,13 +3,13 @@
 	"name": "Zero Density: RealityHub",
 	"shortname": "RealityHub",
 	"description": "Control Zero Density RealityHub 2.1 for virtual production and broadcast graphics",
-	"version": "2.1.21",
+	"version": "2.1.22",
 	"license": "MIT",
 	"repository": "https://github.com/bitfocus/companion-module-zerodensity-realityhub",
 	"bugs": "https://github.com/bitfocus/companion-module-zerodensity-realityhub/issues",
 	"maintainers": [
 		{
-			"name": "Jan Görgen",
+			"name": "Jan G\u00c3\u00b6rgen",
 			"email": "jg@goergen-medien.de"
 		}
 	],
