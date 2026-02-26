@@ -10,27 +10,30 @@ import { engineSelection } from './features/engines.js'
 // ============ BUTTON DEBOUNCE & OPTIMISTIC UI ============
 // Prevents rapid repeated button presses and provides instant visual feedback
 
-// Cooldown tracker: { 'rundownId_itemId_channel': timestamp }
-const buttonCooldowns = {}
-const COOLDOWN_MS = 1500 // 1.5 second cooldown between presses
+// Cooldown tracker: Stored in inst.data.cooldowns
+const COOLDOWN_MS = 2000 // 2 second debounce: no re-press within 2s
 
 /**
  * Check if a button is in cooldown period
+ * @param {Object} inst - Module instance
  * @param {string} key - Unique button key (rundownId_itemId_channel)
  * @returns {boolean} True if button is in cooldown
  */
-const isInCooldown = (key) => {
-    const lastPress = buttonCooldowns[key]
+const isInCooldown = (inst, key) => {
+    if (!inst.data.cooldowns) inst.data.cooldowns = {}
+    const lastPress = inst.data.cooldowns[key]
     if (!lastPress) return false
     return (Date.now() - lastPress) < COOLDOWN_MS
 }
 
 /**
  * Mark a button as pressed (start cooldown)
+ * @param {Object} inst - Module instance
  * @param {string} key - Unique button key
  */
-const markButtonPressed = (key) => {
-    buttonCooldowns[key] = Date.now()
+const markButtonPressed = (inst, key) => {
+    if (!inst.data.cooldowns) inst.data.cooldowns = {}
+    inst.data.cooldowns[key] = Date.now()
 }
 
 /**
@@ -852,7 +855,7 @@ function createActions(inst) {
         // Play Item: PUT /lino/rundown/{showId}/play/{itemId}/{preview}
         actions.rundownItemPlay = {
             name: 'Rundown: Play Item',
-            description: 'Play a rundown item to Program (PGM) or Preview (PVW). Has 1.5s cooldown.',
+            description: 'Play a rundown item to Program (PGM) or Preview (PVW). 2s debounce.',
             options: rundownItemOptions(inst.data.rundowns, inst.data.rundownToShowMap, inst.data.shows),
             callback: async (event) => {
                 const parsed = parseRundownItemSelection(event)
@@ -872,13 +875,13 @@ function createActions(inst) {
                     return
                 }
 
-                // Check cooldown
-                const cooldownKey = `${rundownId}_${itemId}_${channel}_play`
-                if (isInCooldown(cooldownKey)) {
-                    inst.log('debug', `Play button in cooldown, ignoring: ${cooldownKey}`)
+                // Check cooldown (2s debounce per item/channel - unified across play/out/toggle)
+                const cooldownKey = `${rundownId}_${itemId}_${channel}`
+                if (isInCooldown(inst, cooldownKey)) {
+                    inst.log('info', `⏳ Button blocked (2s cooldown): item=${itemId}, channel=${channelName}`)
                     return
                 }
-                markButtonPressed(cooldownKey)
+                markButtonPressed(inst, cooldownKey)
 
                 // Optimistic UI: Immediately show as playing
                 applyOptimisticUpdate(inst, rundownId, itemId, channelKey, true)
@@ -892,8 +895,8 @@ function createActions(inst) {
                     // Revert optimistic update on failure
                     applyOptimisticUpdate(inst, rundownId, itemId, channelKey, false)
                 } else {
-                    // Refresh real status from API
-                    refreshRundownItemStatus(inst, showId, rundownId)
+                    // Refresh real status from API (500ms delay to allow RealityHub to process)
+                    refreshRundownItemStatus(inst, showId, rundownId, 500)
                 }
             }
         }
@@ -901,7 +904,7 @@ function createActions(inst) {
         // Out Item: PUT /lino/rundown/{showId}/out/{itemId}/{preview}
         actions.rundownItemOut = {
             name: 'Rundown: Out Item',
-            description: 'Take out a rundown item from Program (PGM) or Preview (PVW). Has 1.5s cooldown.',
+            description: 'Take out a rundown item from Program (PGM) or Preview (PVW). 2s debounce.',
             options: rundownItemOptions(inst.data.rundowns, inst.data.rundownToShowMap, inst.data.shows),
             callback: async (event) => {
                 const parsed = parseRundownItemSelection(event)
@@ -914,13 +917,13 @@ function createActions(inst) {
                 const channelName = channel === '1' ? 'Preview' : 'Program'
                 const channelKey = channel === '1' ? 'preview' : 'program'
 
-                // Check cooldown
-                const cooldownKey = `${rundownId}_${itemId}_${channel}_out`
-                if (isInCooldown(cooldownKey)) {
-                    inst.log('debug', `Out button in cooldown, ignoring: ${cooldownKey}`)
+                // Check cooldown (2s debounce per item/channel - unified across play/out/toggle)
+                const cooldownKey = `${rundownId}_${itemId}_${channel}`
+                if (isInCooldown(inst, cooldownKey)) {
+                    inst.log('info', `⏳ Button blocked (2s cooldown): item=${itemId}, channel=${channelName}`)
                     return
                 }
-                markButtonPressed(cooldownKey)
+                markButtonPressed(inst, cooldownKey)
 
                 // Optimistic UI: Immediately show as not playing
                 applyOptimisticUpdate(inst, rundownId, itemId, channelKey, false)
@@ -934,8 +937,8 @@ function createActions(inst) {
                     // Revert optimistic update on failure (was playing before)
                     applyOptimisticUpdate(inst, rundownId, itemId, channelKey, true)
                 } else {
-                    // Refresh real status from API
-                    refreshRundownItemStatus(inst, showId, rundownId)
+                    // Refresh real status from API (500ms delay to allow RealityHub to process)
+                    refreshRundownItemStatus(inst, showId, rundownId, 500)
                 }
             }
         }
@@ -971,8 +974,8 @@ function createActions(inst) {
                 if (response === null) {
                     inst.log('warn', `Continue item may have failed for: ${endpoint}`)
                 } else {
-                    // Refresh status immediately after successful command
-                    refreshRundownItemStatus(inst, showId, rundownId)
+                    // Refresh status (500ms delay to allow RealityHub to process)
+                    refreshRundownItemStatus(inst, showId, rundownId, 500)
                 }
             }
         }
@@ -1008,8 +1011,8 @@ function createActions(inst) {
                 if (response === null) {
                     inst.log('warn', `Next item step may have failed for: ${endpoint}`)
                 } else {
-                    // Refresh status immediately
-                    refreshRundownItemStatus(inst, showId, rundownId)
+                    // Refresh status (500ms delay to allow RealityHub to process)
+                    refreshRundownItemStatus(inst, showId, rundownId, 500)
                 }
             }
         }
@@ -1017,7 +1020,7 @@ function createActions(inst) {
         // Toggle Item: Play if not playing, Out if playing (like RealityHub UI)
         actions.rundownItemToggle = {
             name: 'Rundown: Toggle Item (Play/Out)',
-            description: 'Toggle item state: Play if not playing, Out if already playing. Single button control like RealityHub UI. Has 1.5s cooldown to prevent rapid presses.',
+            description: 'Toggle item state: Play if not playing, Out if already playing. Single button control like RealityHub UI. 2s debounce.',
             options: rundownItemOptions(inst.data.rundowns, inst.data.rundownToShowMap, inst.data.shows),
             callback: async (event) => {
                 const parsed = parseRundownItemSelection(event)
@@ -1030,13 +1033,13 @@ function createActions(inst) {
                 const channelName = channel === '1' ? 'Preview' : 'Program'
                 const channelKey = channel === '1' ? 'preview' : 'program'
 
-                // Check cooldown - prevent rapid repeated presses
+                // Check cooldown (2s debounce per item/channel - unified across play/out/toggle)
                 const cooldownKey = `${rundownId}_${itemId}_${channel}`
-                if (isInCooldown(cooldownKey)) {
-                    inst.log('debug', `Button in cooldown, ignoring press: ${cooldownKey}`)
+                if (isInCooldown(inst, cooldownKey)) {
+                    inst.log('info', `⏳ Button blocked (2s cooldown): item=${itemId}, channel=${channelName}`)
                     return
                 }
-                markButtonPressed(cooldownKey)
+                markButtonPressed(inst, cooldownKey)
 
                 // Check current play state
                 const isPlaying = isItemPlaying(inst, rundownId, itemId, channelKey)
@@ -1066,8 +1069,8 @@ function createActions(inst) {
                     // Revert optimistic update on failure
                     applyOptimisticUpdate(inst, rundownId, itemId, channelKey, isPlaying)
                 } else {
-                    // Refresh real status from API to confirm state
-                    refreshRundownItemStatus(inst, showId, rundownId)
+                    // Refresh real status from API (500ms delay to allow RealityHub to process)
+                    refreshRundownItemStatus(inst, showId, rundownId, 500)
                 }
             }
         }

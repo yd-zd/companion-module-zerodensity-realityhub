@@ -68,6 +68,7 @@ class RealityHubInstance extends InstanceBase {
 			engines: {},        // Reality Engines (physical machines)
 			shows: {},          // Shows (logical groupings that control engines)
 			rundowns: {},       // Rundowns loaded on running shows
+			cooldowns: {},      // Button debounce/optimistic UI state tracker
 			templates: {},
 			nodes: {},
 			linoEngines: {},    // Backward compatibility (same as shows)
