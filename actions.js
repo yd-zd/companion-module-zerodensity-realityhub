@@ -114,9 +114,10 @@ function createActions(inst) {
                         // trigger of "DoTransition"
                         const response = await inst.POST(endpoint)
 
-                        if (response.success === true) {
+                        if (response?.success === true) {
                             // request property data of selected node to update feedbacks
                             let properties = await inst.GET(`engines/${engine}/nodes/${sString(event.options.node)}/properties`)
+                            if (!Array.isArray(properties)) properties = []
 
                             // loop over all properties in response to find transision duration
                             for (const property of properties) {
@@ -129,6 +130,7 @@ function createActions(inst) {
                                             {},
                                             'medium'
                                         )
+                                        if (!Array.isArray(properties)) properties = []
 
                                         // loop over all properties in response to find feedback relevant data
                                         for (const property of properties) {
@@ -568,7 +570,17 @@ function createActions(inst) {
                     try {
                         const response = await inst.PATCH(endpoint, { Value: event.options.name })
 
-                        if (Object.keys(response).length === 0) throw new Error('ResponseError')
+                        if (
+                            response == null ||
+                            Array.isArray(response) ||
+                            typeof response !== 'object' ||
+                            response.PropertyPath === undefined ||
+                            response.Value === undefined
+                        ) {
+                            inst.log('error', `Unexpected response! (action: ${event.actionId}, engine: ${engine})\nrequest: ${endpoint}`)
+                            return
+                        }
+
                         deepSetProperty(inst.data.nodes, [engine, event.options.node, 'properties', response.PropertyPath], response.Value)
                         inst.checkFeedbacks('basicMixerChannel', 'nodesCheckPropertyValue')
                     }
