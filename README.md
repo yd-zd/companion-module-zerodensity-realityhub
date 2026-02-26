@@ -1,6 +1,6 @@
 # companion-module-zerodensity-realityhub
 
-Bitfocus Companion module for controlling **Zero Density RealityHub 2.1** - virtual production and broadcast graphics control.
+Bitfocus Companion module for controlling **Zero Density RealityHub 2.1** for virtual production and broadcast graphics control.
 
 ## Features
 
@@ -20,6 +20,31 @@ Bitfocus Companion module for controlling **Zero Density RealityHub 2.1** - virt
 ## Installation
 
 Import this module through Companion's built-in module interface, or download a release package and use "Import module package".
+
+## Development
+
+Install dependencies:
+
+```bash
+yarn install --frozen-lockfile
+```
+
+Common commands:
+
+```bash
+yarn test
+yarn package
+```
+
+## CI/CD and Versioning
+
+- CI runs in GitHub Actions using:
+  - `.github/workflows/companion-module-checks.yaml` (Bitfocus module checks)
+  - `.github/workflows/node.yaml` (test, package)
+- `yarn lint` is available locally for incremental cleanup.
+- Releases are tag-driven via `.github/workflows/release.yaml`.
+- Version source of truth is `package.json`.
+- Tag releases using `vX.Y.Z` (example: `v2.1.24`).
 
 ## Documentation
 

@@ -1,0 +1,65 @@
+name: Node CI
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+  pull_request:
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: yarn
+      - name: Prepare Environment
+        run: |
+          corepack enable
+          yarn install --frozen-lockfile
+        env:
+          CI: true
+      - name: Run tests
+        run: |
+          yarn test
+        env:
+          CI: true
+
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: yarn
+      - name: Prepare Environment
+        run: |
+          corepack enable
+          yarn install --frozen-lockfile
+        env:
+          CI: true
+      - name: Build module package
+        run: |
+          yarn package
+        env:
+          CI: true
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: module-package
+          path: "*.tgz"
+          if-no-files-found: error
+          retention-days: 7
