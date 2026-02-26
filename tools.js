@@ -153,6 +153,10 @@ export const basicFeedback = (inst, event, data) => {
             inst.data.module.feedbackRequestActive[`/e:${engine}/n:${event.options.node}`] = true
             inst.log('debug', `FeedbackRequestActive: "/e:${engine}/n:${event.options.node}"`)
             inst.GET(`engines/${engine}/nodes/${sString(event.options.node)}/properties`, {}, 'medium').then((response) => {
+                if (!Array.isArray(response)) {
+                    response = []
+                }
+                
                 for (const property of response) {
                     if (data.requestProperties.includes(property.PropertyPath)) {
                         deepSetProperty(
