@@ -46,6 +46,15 @@ yarn package
 - Version source of truth is `package.json`.
 - Tag releases using `vX.Y.Z` (example: `v2.1.24`).
 
+Release from `main` with:
+
+```bash
+git checkout main
+git pull origin main
+git tag v2.1.24
+git push origin v2.1.24
+```
+
 ## Documentation
 
 See [companion/HELP.md](companion/HELP.md) for full configuration and usage documentation.
