@@ -24,6 +24,7 @@ Import this module through Companion's built-in module interface, or download a 
 ## Documentation
 
 See [companion/HELP.md](companion/HELP.md) for full configuration and usage documentation.
+Maintainer process and release rules are documented in [MAINTAINERS.md](MAINTAINERS.md).
 
 ## License
 
