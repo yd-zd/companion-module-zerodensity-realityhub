@@ -168,10 +168,22 @@ export const refreshRundownItemStatus = async (inst, showId, rundownId, delayMs 
 
         if (itemsData !== null && Array.isArray(itemsData) && inst.data.rundowns[rundownId]) {
             // Update status for each item
+            const COOLDOWN_MS = 2000
+            const now = Date.now()
+
             for (const item of itemsData) {
                 const itemId = item.id
                 if (inst.data.rundowns[rundownId].items[itemId]) {
-                    inst.data.rundowns[rundownId].items[itemId].status = item.status || null
+                    // Check if item is in cooldown (optimistic state active)
+                    // If so, DO NOT overwrite with potentially stale data from API
+                    const pvwKey = `${rundownId}_${itemId}_1`
+                    const pgmKey = `${rundownId}_${itemId}_2`
+                    const inCooldown = (inst.data.cooldowns?.[pvwKey] && (now - inst.data.cooldowns[pvwKey] < COOLDOWN_MS)) ||
+                                       (inst.data.cooldowns?.[pgmKey] && (now - inst.data.cooldowns[pgmKey] < COOLDOWN_MS))
+                    
+                    if (!inCooldown) {
+                        inst.data.rundowns[rundownId].items[itemId].status = item.status || null
+                    }
                 }
             }
 
@@ -595,6 +607,51 @@ export const loadRundowns = async (inst) => {
     // Update rundowns object with results
     for (const result of results) {
         rundowns[result.key] = result.data
+    }
+
+    // PRESERVE OPTIMISTIC STATES
+    // If an item is in cooldown (recently pressed), keep its optimistic status
+    // to prevent "flashing" when polling returns stale server state.
+    if (inst.data.cooldowns) {
+        const COOLDOWN_MS = 2000 // Must match actions.js
+        const now = Date.now()
+        
+        for (const [rundownId, rundown] of Object.entries(rundowns)) {
+            if (!rundown.items) continue
+            
+            for (const [itemId, item] of Object.entries(rundown.items)) {
+                if (!item.status) {
+                    item.status = { preview: 'Available', program: 'Available', isActive: false, activeIn: [], online: true }
+                }
+
+                // Check Preview cooldown
+                const pvwKey = `${rundownId}_${itemId}_1`
+                if (inst.data.cooldowns[pvwKey] && (now - inst.data.cooldowns[pvwKey] < COOLDOWN_MS)) {
+                     const oldItem = inst.data.rundowns?.[rundownId]?.items?.[itemId]
+                     if (oldItem?.status) {
+                         item.status.preview = oldItem.status.preview
+                     }
+                }
+                
+                // Check Program cooldown
+                const pgmKey = `${rundownId}_${itemId}_2`
+                if (inst.data.cooldowns[pgmKey] && (now - inst.data.cooldowns[pgmKey] < COOLDOWN_MS)) {
+                     const oldItem = inst.data.rundowns?.[rundownId]?.items?.[itemId]
+                     if (oldItem?.status) {
+                         item.status.program = oldItem.status.program
+                     }
+                }
+                
+                // Re-calculate derived status
+                const previewPlaying = item.status.preview === 'Playing'
+                const programPlaying = item.status.program === 'Playing'
+                item.status.isActive = previewPlaying || programPlaying
+                
+                item.status.activeIn = []
+                if (previewPlaying) item.status.activeIn.push('preview')
+                if (programPlaying) item.status.activeIn.push('program')
+            }
+        }
     }
 
     if (inst.enableRequests === false) {
